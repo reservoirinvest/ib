@@ -1,0 +1,16 @@
+# Ignore folders
+__pycache__
+venv
+.venv
+.vscode
+
+
+# Ignore files
+logs/*.*
+*.cfg
+z*.*
+*.env
+*checkpoint.*
+.ipynb_checkpoints
+
+
