@@ -3,6 +3,7 @@ __pycache__
 venv
 .venv
 .vscode
+zz*
 
 
 # Ignore files
