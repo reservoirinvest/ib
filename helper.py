@@ -2,12 +2,14 @@
 
 import datetime
 import re
+import sys
 from pathlib import Path
 
 import pandas as pd
 import pytz
 import requests
 import yaml
+from ruamel import yaml as ry
 
 root = Path.cwd()
 config_path = root / 'conf' / 'config.yml'
@@ -141,8 +143,16 @@ def nse_opts(symbol: str) -> pd.DataFrame:
 
     return df
 
-    
+
+def dict_to_yaml(d: dict):
+    """Converts dictionary to YAML"""
+
+    yml = ry.YAML()
+    yml.default_flow_style = None
+    result = yml.dump(d, sys.stdout)
+    return result
+
 
 if __name__ == "__main__":
-    symbol = 'reliance'
+    symbol = 'banknifty'
     print(nse_opts(symbol).head())
