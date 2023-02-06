@@ -22,10 +22,10 @@ eq_history_params:
    segmentLink: 3
    dateRange: ''
 
-index_symbols:
+index_for_history:
    NIFTY: 'NIFTY 50'
    BANKNIFTY: 'NIFTY BANK'
-   # NIFTYINFRA: 'NIFTY INFRA'
-   # NIFTYIT: 'NIFTY IT'
-   # NIFTYMID50: 'NIFTY MIDCAP 50'
-   # NIFTYPSE: 'NIFTY PSE'
+   NIFTYINFRA: 'NIFTY INFRA'
+   NIFTYIT: 'NIFTY IT'
+   NIFTYMID50: 'NIFTY MIDCAP 50'
+   NIFTYPSE: 'NIFTY PSE'
