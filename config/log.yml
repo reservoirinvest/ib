@@ -9,16 +9,24 @@ formatters:
 handlers:
   console:
     class: logging.StreamHandler
-    level: DEBUG
+    level: INFO
     formatter: simple
     stream: ext://sys.stdout
+  file:
+    class: logging.handlers.TimedRotatingFileHandler
+    level: DEBUG
+    formatter: extended
+    when: midnight
+    backupCount: 0
+    interval: 1
+    filename: ./logs/ib.log
 
 loggers:
-  sampleLogger:
+  ib_log:
     level: DEBUG
-    handlers: [console]
+    handlers: [console, file]
     propagate: no
 
 root:
   level: DEBUG
-  handlers: [console]
+  handlers: [console, file]

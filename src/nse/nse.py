@@ -1,4 +1,4 @@
-import datetime
+import logging
 from io import StringIO
 
 import numpy as np
@@ -6,6 +6,8 @@ import pandas as pd
 import requests
 from nsepython import nse_get_fno_lot_sizes, nse_optionchain_scrapper
 
+# prevent urllib DEBUG connectionpool logs from nsepython requests
+logging.getLogger('urllib3').setLevel(logging.WARNING) 
 
 def get_nse_syms() -> pd.DataFrame:
     """Generates symbols for nse with expiry months having lots"""
@@ -42,7 +44,7 @@ def get_nse_syms() -> pd.DataFrame:
 
     return df_syms
 
-def get_nse_opts(symbol: str) -> pd.DataFrame:
+def get_nse_chain(symbol: str) -> pd.DataFrame:
         """Get Option Chains for a symbol"""
 
         scraped = nse_optionchain_scrapper(symbol)
@@ -82,5 +84,5 @@ def get_nse_opts(symbol: str) -> pd.DataFrame:
 
 if __name__ == "__main__":
     # df = get_nse_syms()
-    df = get_nse_opts('NIFTY')
+    df = get_nse_chain('NIFTY')
     print(df)
