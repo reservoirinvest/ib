@@ -1,10 +1,12 @@
 import logging
+from datetime import datetime, timedelta
 from io import StringIO
 
 import numpy as np
 import pandas as pd
 import requests
 from nsepython import nse_get_fno_lot_sizes, nse_optionchain_scrapper
+from nsepy import get_history
 
 # prevent urllib DEBUG connectionpool logs from nsepython requests
 logging.getLogger('urllib3').setLevel(logging.WARNING) 
@@ -82,7 +84,45 @@ def get_nse_chain(symbol: str) -> pd.DataFrame:
 
         return df
 
+
+
+def get_nse_hist(symbol: str, 
+        is_index: bool,
+        days: int=365 ) -> pd.DataFrame:
+    
+    end = datetime.now().date()
+    start = end-timedelta(days=days)
+    cols = {'Date': 'date',
+            'Open': 'open',
+            'High': 'high',
+            'Low': 'low',
+            'Close': 'close',
+            'Volume': 'volume',
+            'Turnover': 'turnover',
+            'Symbol': 'symbol',
+            'Series': 'series',
+            'Prev Close': 'prev_cls',
+            'Last': 'last',
+            'VWAP': 'vwap',
+            'Trades': 'trades',
+            'Deliverable Volume': 'd_volume',
+            '%Deliverble': 'pct_delv'}
+
+    # call
+    data = get_history(symbol=symbol, start=start, end=end, index=is_index).reset_index()
+    data.Date = data.Date.apply(pd.to_datetime)
+
+    # if index, put in symbol column
+    if is_index:
+        data.insert(0, 'Symbol', symbol)
+
+    data.rename(columns=cols, inplace=True)
+
+    return data
+
 if __name__ == "__main__":
     # df = get_nse_syms()
-    df = get_nse_chain('NIFTY')
+    # df = get_nse_chain('NIFTY')
+    df = get_history('NIFTY', True, 365)
+
     print(df)

@@ -1,5 +1,4 @@
 import datetime
-from collections import defaultdict
 from pathlib import Path
 from typing import Union
 
@@ -29,7 +28,9 @@ def pickle_age(data_path: Path) -> dict:
 
     # Get all the pickles in data path provided
     pickles = Path(data_path).glob('*.pkl')
-    d = {f.name: dateutil.relativedelta.relativedelta(datetime.datetime.now(), datetime.datetime.fromtimestamp(f.stat().st_mtime)) for f in pickles}
+    d = {f.name: dateutil.relativedelta.relativedelta(datetime.datetime.now(), 
+                 datetime.datetime.fromtimestamp(f.stat().st_mtime)) 
+                      for f in pickles}
 
     return d
 
