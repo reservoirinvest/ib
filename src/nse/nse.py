@@ -9,7 +9,28 @@ from nsepython import nse_get_fno_lot_sizes, nse_optionchain_scrapper
 from nsepy import get_history
 
 # prevent urllib DEBUG connectionpool logs from nsepython requests
-logging.getLogger('urllib3').setLevel(logging.WARNING) 
+logging.getLogger('urllib3').setLevel(logging.WARNING)
+
+headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:74.0) Gecko/20100101 Firefox/74.0'
+}
+
+def nse_json(url: str):
+    """Fetch json from nse for the url provided"""
+    try:
+        output = requests.get(url,headers=headers).json()
+
+    except ValueError:
+        try:
+            s=requests.Session()
+            output = s.get("http://nseindia.com",headers=headers)
+            output = s.get(url,headers=headers).json()
+
+        except ValueError: # for csv loads generating JSONDecodeError
+            output = requests.get(url).text
+        
+    return output
+
 
 def get_nse_syms() -> pd.DataFrame:
     """Generates symbols for nse with expiry months having lots"""
