@@ -15,6 +15,7 @@ headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:74.0) Gecko/20100101 Firefox/74.0'
 }
 
+
 def nse_json(url: str):
     """Fetch json from nse for the url provided"""
     try:
@@ -32,7 +33,8 @@ def nse_json(url: str):
     return output
 
 
-def get_nse_syms() -> pd.DataFrame:
+
+def get_nse_syms(onlyWithHist: bool=True) -> pd.DataFrame:
     """Generates symbols for nse with expiry months having lots"""
 
     url = "https://www1.nseindia.com/content/fo/fo_mktlots.csv"
@@ -47,7 +49,7 @@ def get_nse_syms() -> pd.DataFrame:
     except pd.errors.ParserError as e:
         print(f"Parser Error {e}")
 
-    df_syms = df_syms[list(df_syms)[1:5]] 
+    df_syms = df_syms[list(df_syms)[1:5]]
 
     # strip whitespace from columns and make it lower case
     df_syms.columns = df_syms.columns.str.strip().str.lower()
@@ -59,13 +61,22 @@ def get_nse_syms() -> pd.DataFrame:
     # remove 'Symbol' row
     df_syms = df_syms[df_syms.symbol != "Symbol"]
 
+    # drop symbols not able to generate history!
+    if onlyWithHist:
+        searchfor = ['MIDCPNIFTY', 'FINNIFTY']
+        drop_me = df_syms[df_syms.symbol.str.contains('|'.join(searchfor))].index
+        df_syms.drop(drop_me, inplace=True)
+
     # introduce `secType`
-    df_syms.insert(1, 'secType', np.where(df_syms.symbol.str.contains('NIFTY'), 'IND', 'STK'))
+    df_syms.insert(1, 'secType', 
+                   np.where(df_syms.symbol.str.contains('NIFTY'), 'IND', 'STK'))
 
     # introduce `exchange`
     df_syms.insert(2, 'exchange', 'NSE')
 
     return df_syms
+
+
 
 def get_nse_chain(symbol: str) -> pd.DataFrame:
         """Get Option Chains for a symbol"""
@@ -131,19 +142,107 @@ def get_nse_hist(symbol: str,
 
     # call
     data = get_history(symbol=symbol, start=start, end=end, index=is_index).reset_index()
-    data.Date = data.Date.apply(pd.to_datetime)
+
+    if data.empty:
+            logging.error(f'Could not generate history for {symbol}')
+            data = None 
+            return data
+
+    data.insert(0, 'date', data.Date.apply(pd.to_datetime)) 
+    data.drop('Date', axis=1, inplace=True) # remove old Date field
+
+    # convert to end of day India time
+    date=(data.date + pd.Timedelta(hours=16)).dt.tz_localize('Asia/Calcutta')
+    data = data.assign(date=date)
 
     # if index, put in symbol column
     if is_index:
-        data.insert(0, 'Symbol', symbol)
+            data.insert(0, 'Symbol', symbol)
 
     data.rename(columns=cols, inplace=True)
 
     return data
 
+
+
+def equity_prices() -> pd.DataFrame:
+    """Gets all live equity prices"""
+
+    url = "https://www1.nseindia.com/live_market/dynaContent/live_watch/stock_watch/foSecStockWatch.json"
+
+    js = nse_json(url)
+    x = []
+
+    for item in js['data']:
+        df = pd.DataFrame.from_dict([item])
+        x.append(df)
+    df = pd.concat(x, ignore_index=True)
+
+    return df
+
+
+
+def index_prices(important: bool = True) -> pd.DataFrame:
+    """Gets all live index prices 
+    (equity index only. No bonds, etc)"""
+
+    url = 'https://iislliveblob.niftyindices.com/jsonfiles/LiveIndicesWatch.json'
+    js = nse_json(url) # works!
+
+    x = []
+    for item in js['data']:
+        df = pd.DataFrame.from_dict([item])
+        x.append(df)
+    df = pd.concat(x, ignore_index=True)
+
+    # keep only equities
+    df = df[(df.indexType == 'eq') & (df.yearHigh != '-')].reset_index(drop=True)
+
+    # symbol map for fno index (except `INDIAVIX`)
+    di = {'NIFTY 50': 'NIFTY', 'NIFTY BANK': 'BANKNIFTY', 'INDIA VIX': 
+          'INDIAVIX', 'NIFTY FIN SERVICE': 'FINNIFTY',
+          'NIFTY MIDCAP 50': 'MIDCPNIFTY',}
+    df.insert(0, 'symbol', df.indexName.map(di).fillna(df.indexName))
+
+    if important:
+        df = df[df.symbol.isin(di.values())]
+
+    return df
+
+
+
+def is_nse_open() -> bool:
+    """Gives a True if nse is open"""
+
+    url = 'https://nseindia.com/api/marketStatus'
+    js = nse_json(url) # works!
+    nse_is_open = js[list(js.keys())[0]][0]['marketStatus'] != 'Closed'
+
+    return nse_is_open
+
+
+
+def get_prices() -> pd.DataFrame:
+    """Get the underlying prices"""
+
+    df_eq = equity_prices()
+    df_ix = index_prices()
+
+    df = pd.concat([df_eq, df_ix], ignore_index=True)
+    ltp = df['last'].combine_first(df.ltP)
+    df = df.assign(last=ltp, ltP=ltp)
+
+    # harmonize time to time value
+    df.timeVal = pd.to_datetime(df.timeVal).dt.tz_localize('Asia/Calcutta')
+    df.timeVal = df.timeVal.max()
+
+    return df
+
+
+
 if __name__ == "__main__":
     # df = get_nse_syms()
     # df = get_nse_chain('NIFTY')
-    df = get_history('NIFTY', True, 365)
+    df = get_nse_hist('M&M', True, 365)
 
     print(df)
