@@ -16,6 +16,7 @@ headers = {
 }
 
 
+
 def nse_json(url: str):
     """Fetch json from nse for the url provided"""
     try:
@@ -73,6 +74,17 @@ def get_nse_syms(onlyWithHist: bool=True) -> pd.DataFrame:
 
     # introduce `exchange`
     df_syms.insert(2, 'exchange', 'NSE')
+
+    # make ib friendly symbols
+    df_syms.insert(1, 'ib_sym', df_syms.symbol.apply(nse2ib_symbol_convert))
+
+    # ntoi = {
+    #     "M&M": "MM",
+    #     "M&MFIN": "MMFIN",
+    #     "L&TFH": "LTFH",
+    #     "NIFTY": "NIFTY50"
+    # }
+    # df_syms.ib_sym = df_syms.symbol.replace(ntoi)
 
     return df_syms
 
@@ -165,6 +177,33 @@ def get_nse_hist(symbol: str,
 
 
 
+def clean_prices(df: pd.DataFrame) -> pd.DataFrame:
+    "Cleans up NSE prices to give numeric values and times"
+
+    # stage a numeric df, removing commas from price text
+    df = df.apply(lambda x: 
+                  pd.to_numeric(x.astype(str).str.replace(',',''), 
+                                errors='ignore'))
+    df2 = df.apply(pd.to_numeric, errors='coerce')
+    df2 = df2.dropna(axis=1, how='all') \
+          .drop(columns=['timeVal', 'percChange', 'indexOrder'], errors='ignore')
+
+    # Prep the mother df
+    df1 = df.drop(columns=list(df2.columns))
+
+    # convert xDt to date dict
+    try: # to get equityies only
+        s = pd.Series(df.xDt.unique())
+        di = pd.to_datetime(s, errors='coerce').set_axis(s).to_dict()
+        df1 = df1.assign(xDt = df1.xDt.map(di))
+    except AttributeError:
+        pass
+
+    df_final = pd.concat([df1, df2], axis=1)
+
+    return df_final
+
+
 def equity_prices() -> pd.DataFrame:
     """Gets all live equity prices"""
 
@@ -177,6 +216,8 @@ def equity_prices() -> pd.DataFrame:
         df = pd.DataFrame.from_dict([item])
         x.append(df)
     df = pd.concat(x, ignore_index=True)
+
+    df = clean_prices(df) # handle obj -> numerics, times
 
     return df
 
@@ -206,6 +247,8 @@ def index_prices(important: bool = True) -> pd.DataFrame:
 
     if important:
         df = df[df.symbol.isin(di.values())]
+
+    df = clean_prices(df) # handle obj -> numerics, times
 
     return df
 
@@ -240,9 +283,20 @@ def get_prices() -> pd.DataFrame:
 
 
 
+def nse2ib_symbol_convert(s: str) -> str:
+    """Convert NSE symbols to IB compatible symbols"""
+    
+    res = s[:9].replace("&", "")
+    if res == 'NIFTY':
+        res = 'NIFTY50'
+
+    return res
+
+
+
 if __name__ == "__main__":
-    # df = get_nse_syms()
+    df = get_nse_syms()
     # df = get_nse_chain('NIFTY')
-    df = get_nse_hist('M&M', True, 365)
+    # df = get_nse_hist('M&M', True, 365)
 
     print(df)

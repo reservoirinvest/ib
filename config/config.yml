@@ -1,31 +1,18 @@
-headers: &value
-   Connection: keep-alive
-   Cache-Control: max-age=0
-   DNT: '1'
-   Upgrade-Insecure-Requests: '1'
-   User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML like Gecko) Chrome/79.0.3945.79 Safari/537.36
-   Sec-Fetch-User: '?1'
-   Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9
-   Sec-Fetch-Site: none
-   Sec-Fetch-Mode: navigate
-   Accept-Encoding: gzip deflate br
-   Accept-Language: en-US,en;q=0.9,hi;q=0.8
+COMMON: &common
+  HOST: 127.0.0.1
+  BAR_FORMAT: "{desc:<10}{percentage:3.0f}%|{bar:25}{r_bar}{bar:-10b}"
 
-opt_headers: 
-   <<: *value
-   Host: www1.nseindia.com
-   Accept: '*/*'
-   X-Requested-With: XMLHttpRequest
+NSE:
+  <<: *common # add the common configuration
 
-eq_history_params:
-   dataType: PRICEVOLUMEDELIVERABLE
-   segmentLink: 3
-   dateRange: ''
+  PORT: 3000
+  PAPER: 3001 # For paper trades in IBG
+  EXCHANGE: 'NSE'
+  CURRENCY: 'INR'
 
-index_for_history:
-   NIFTY: 'NIFTY 50'
-   BANKNIFTY: 'NIFTY BANK'
-   NIFTYINFRA: 'NIFTY INFRA'
-   NIFTYIT: 'NIFTY IT'
-   NIFTYMID50: 'NIFTY MIDCAP 50'
-   NIFTYPSE: 'NIFTY PSE'
+  CALLSTDMULT: 1.95 # Min stdev multiple for calls
+  PUTSTDMULT: 1.9 # Min stdev multiple for puts
+  MINEXPROM: 1.55 # Minimum expected return on margin
+  MINOPTSELLPRICE: 0.2 # Minimum option selling price
+
+  PREC: 0.05 # For Option trade price

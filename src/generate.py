@@ -13,7 +13,7 @@ from nse.nse import get_nse_chain, get_nse_hist
 from support import get_dte, pickle_age
 
 root = Path.cwd()
-bar_format = "{desc:<10}{percentage:3.0f}%|{bar:25}{r_bar}{bar:-10b}"
+BAR_FORMAT = "{desc:<10}{percentage:3.0f}%|{bar:25}{r_bar}{bar:-10b}"
 
 with open(root / 'config' / 'log.yml', 'r') as f:
     config = yaml.safe_load(f.read())
@@ -42,7 +42,7 @@ old_chains = chain_age > days_old
 dfs = []
 
 if old_chains:
-    tq_scrips = tqdm(df_syms.symbol, bar_format=bar_format)
+    tq_scrips = tqdm(df_syms.symbol, bar_format=BAR_FORMAT)
     for s in tq_scrips:
         tq_scrips.set_description(f"{s}")
         try:
@@ -94,7 +94,7 @@ dfs = []
 hist_days = 365
 
 if old_hists:
-    tq_scrips = tqdm(scrips.items(), bar_format=bar_format)
+    tq_scrips = tqdm(scrips.items(), bar_format=BAR_FORMAT)
     for k, v in tq_scrips:
         tq_scrips.set_description(f"{k}")
         try:
