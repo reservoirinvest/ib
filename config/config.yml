@@ -4,7 +4,6 @@ COMMON: &common
 
 NSE:
   <<: *common # add the common configuration
-
   PORT: 3000
   PAPER: 3001 # For paper trades in IBG
   EXCHANGE: 'NSE'
