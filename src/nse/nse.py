@@ -78,14 +78,6 @@ def get_nse_syms(onlyWithHist: bool=True) -> pd.DataFrame:
     # make ib friendly symbols
     df_syms.insert(1, 'ib_sym', df_syms.symbol.apply(nse2ib_symbol_convert))
 
-    # ntoi = {
-    #     "M&M": "MM",
-    #     "M&MFIN": "MMFIN",
-    #     "L&TFH": "LTFH",
-    #     "NIFTY": "NIFTY50"
-    # }
-    # df_syms.ib_sym = df_syms.symbol.replace(ntoi)
-
     return df_syms
 
 

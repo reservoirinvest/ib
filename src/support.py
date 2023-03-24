@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import logging
 from pathlib import Path
 from typing import Union
 
@@ -56,7 +57,7 @@ def get_closest(df: pd.DataFrame, arg1: str = 'price', arg2: str = 'strike', g: 
 
 
 
-async def qualifyAsync(ib, contracts: list, BLK_SIZE: int=2002) -> list:
+async def qualifyAsync(ib, contracts: list, BLK_SIZE: int=2002, port: int=3000) -> list:
 
     """Asynchronously qualifies IB contracts at 45 secs per 2k contracts"""
 
@@ -77,7 +78,7 @@ async def qualifyAsync(ib, contracts: list, BLK_SIZE: int=2002) -> list:
 
     async for cblk in AsyncIter(pbar:=tqdm(raw_blks, bar_format=BAR_FORMAT)):
 
-        with await ib.connectAsync(port=3000):
+        with await ib.connectAsync(port=port):
 
             desc = f"{cblk[0].symbol}{cblk[0].lastTradeDateOrContractMonth}{cblk[0].strike}{cblk[0].right} : "
             desc = desc + f"{cblk[-1].symbol}{cblk[-1].lastTradeDateOrContractMonth}{cblk[-1].strike}{cblk[-1].right}"
@@ -92,54 +93,6 @@ async def qualifyAsync(ib, contracts: list, BLK_SIZE: int=2002) -> list:
 
 
 
-async def get_marginsAsync(ib, cos: list) -> dict:
-    """get margins from a list of (contract, order) tuples"""
-
-    results = dict()
-
-    with await ib.connectAsync(port=3000):
-
-        async for ct, ord in (pbar := tqdm(cos, bar_format=BAR_FORMAT)):
-
-            pbar.set_description(f"{ct.localSymbol:}")
-
-            results[ct.conId] = await ib.whatIfOrderAsync(ct, ord)
-
-    return results
-
-
-
-# async def marginsAsync(ib, contracts: list, orders: list, timeout: float=2) -> pd.DataFrame:
-#     """Gets margins very fast"""
-
-#     with ib.connect(port=3000):
-      
-#       async def wifAsync(ct, o):
-#          wif = ib.whatIfOrderAsync(ct, o)
-#          try:
-#             res = await asyncio.wait_for(wif, timeout=timeout)
-#          except asyncio.TimeoutError:
-#             res = None
-#          return res
-      
-#       wif_tasks = [asyncio.create_task(wifAsync(contract, order), name=contract.conId) for contract, order in zip(contracts, orders)]
-      
-#       res = await asyncio.gather(*wif_tasks)
-      
-#       margins = [{'margin': r.initMarginChange, 
-#                   'commission': r.commission, 
-#                   'maxCommission': r.maxCommission} 
-#                   for r in res if r]
-      
-#       conIds = [c.conId for c in contracts]
-
-#       results = dict(zip(conIds, margins))
-
-#     df = pd.DataFrame(results).transpose()
-#     df = df.rename_axis('conId').reset_index()
-
-#     return df
-
 class AsyncIter:
     """Makes iterable object blocks of contract lists"""    
     def __init__(self, items):    
@@ -149,7 +102,7 @@ class AsyncIter:
         for item in self.items:    
             yield item   
 
-async def marginsAsync(ib, contracts: list, orders: list, BLK_SIZE: int=44, timeout: float=2) -> dict:
+async def marginsAsync(ib, contracts: list, orders: list, BLK_SIZE: int=44, timeout: float=5, port: int=3000) -> dict:
     """Gets margins and commissions"""
 
     raw_blks = [(contracts[i:i + BLK_SIZE], orders[i:i + BLK_SIZE]) for i in range(0, len(contracts), BLK_SIZE)]
@@ -159,15 +112,16 @@ async def marginsAsync(ib, contracts: list, orders: list, BLK_SIZE: int=44, time
         wif = ib.whatIfOrderAsync(ct, o)
         try:
             res = await asyncio.wait_for(wif, timeout=timeout)
-        except asyncio.TimeoutError:
+        except (asyncio.TimeoutError, asyncio.CancelledError):
             res = None
+            logging.error(f"Whatif for {ct.localSymbol} timedout with {timeout} or got cancelled")
         return res
 
     async for cblk in (pbar := tqdm(raw_blks)):
 
         pbar.bar_format = BAR_FORMAT
 
-        with await ib.connectAsync(port=3000):
+        with await ib.connectAsync(port=port):
         
             cts, ords = cblk    
 
