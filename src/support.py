@@ -155,6 +155,19 @@ async def marginsAsync(ib, contracts: list, orders: list, BLK_SIZE: int=44, time
     return dfs
 
 
+
+def find_dir_path_in_cwd(find_dir: str) -> Path:
+    """Finds directory in current path and returns its path"""
+
+    find_in = Path.cwd().parts
+
+    try:
+        dir_idx = find_in.index(find_dir)
+    except ValueError:
+        raise Exception(f"{find_dir} not found in {Path.cwd()}. Cannot proceed.")
+    found = find_in[:dir_idx+1]
+    return Path(*found)
+
 if __name__ == "__main__":
     dt = datetime.datetime(2023, 5, 13) # x is to be converted to mkt close
     exchange = 'nse'
