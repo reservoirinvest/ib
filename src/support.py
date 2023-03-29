@@ -169,7 +169,5 @@ def find_dir_path_in_cwd(find_dir: str) -> Path:
     return Path(*found)
 
 if __name__ == "__main__":
-    dt = datetime.datetime(2023, 5, 13) # x is to be converted to mkt close
-    exchange = 'nse'
 
-    print(get_dte(dt, exchange))
+    print(find_dir_path_in_cwd('ib'))

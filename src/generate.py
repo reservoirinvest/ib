@@ -11,8 +11,8 @@ from ib_insync import IB, Contract, MarketOrder
 from tqdm import tqdm
 
 from nse.nse import get_nse_chain, get_nse_hist, get_nse_syms, get_prices
-from support import (get_closest, get_dte, pickle_age,
-                     qualifyAsync, marginsAsync)
+from support import (find_dir_path_in_cwd, get_closest, get_dte, marginsAsync,
+                     qualifyAsync)
 
 root = Path.cwd().parent
 
@@ -213,20 +213,30 @@ def get_opt_margins(ib, df_syms: pd.DataFrame, df_ch: pd.DataFrame, df_margin: p
 
 if __name__ == "__main__":
 
-    datapath = Path(r'C:\Users\kashi\python\ib\data\master')
+    root = find_dir_path_in_cwd('ib')
+
+    # datapath = Path(r'C:\Users\kashi\python\ib\data\master')
+    datapath = root / 'data' / 'master'
     
     df_syms = get_nse_syms()
+    logging.info('Symbols generated')
 
-    # df_chains = make_chains(pd.DataFrame(df_syms), 
-    #                         savepath=datapath / 'nse_chains.pkl')
+    df_chains = make_chains(pd.DataFrame(df_syms), 
+                            savepath=datapath / 'nse_chains.pkl')
+    logging.info('Chains made')
 
-    # df_hist = make_history(df_syms.iloc[:2])
+    # df_chains = pd.read_pickle(datapath / 'nse_chains.pkl')
 
-    df_chains = pd.read_pickle(datapath / 'nse_chains.pkl')
+    df_hist = make_history(df_syms, savepath=datapath / 'nse_hists.pkl')
+    logging.info('Histores made')
+
+    # df_hist = pd.read_pickle(datapath / 'nse_hists.pkl')
     
     df_unds = get_und_margins(ib, df_syms, df_chains, 
                               savepath=datapath / 'nse_margins.pkl')
+    logging.info('Underlying margins extracted')
     
     df_opt_margins = get_opt_margins(ib, df_syms=df_syms, df_ch=df_chains, df_margin=df_unds, savepath=datapath / 'nse_opt_margins.pkl')
+    logging.info('All NSE Options with margins generated')
 
     print(df_opt_margins)
