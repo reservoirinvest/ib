@@ -3,7 +3,9 @@ __pycache__
 venv
 .venv
 .vscode
-zz*
+z*
+**/master/z*
+
 
 
 # Ignore files

@@ -5,8 +5,10 @@ from io import StringIO
 import numpy as np
 import pandas as pd
 import requests
-from nsepython import nse_get_fno_lot_sizes, nse_optionchain_scrapper
 from nsepy import get_history
+from nsepython import nse_get_fno_lot_sizes, nse_optionchain_scrapper
+
+from .support import nse2ib_symbol_convert
 
 # prevent urllib DEBUG connectionpool logs from nsepython requests
 logging.getLogger('urllib3').setLevel(logging.WARNING)
@@ -196,6 +198,7 @@ def clean_prices(df: pd.DataFrame) -> pd.DataFrame:
     return df_final
 
 
+
 def equity_prices() -> pd.DataFrame:
     """Gets all live equity prices"""
 
@@ -272,17 +275,6 @@ def get_prices() -> pd.DataFrame:
     df.timeVal = df.timeVal.max()
 
     return df
-
-
-
-def nse2ib_symbol_convert(s: str) -> str:
-    """Convert NSE symbols to IB compatible symbols"""
-    
-    res = s[:9].replace("&", "")
-    if res == 'NIFTY':
-        res = 'NIFTY50'
-
-    return res
 
 
 
