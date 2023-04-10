@@ -7,8 +7,12 @@ import pandas as pd
 import requests
 from nsepy import get_history
 from nsepython import nse_get_fno_lot_sizes, nse_optionchain_scrapper
+from tqdm import tqdm
 
-from .support import nse2ib_symbol_convert
+from support import nse2ib_symbol_convert, get_dte
+
+BAR_FORMAT = "{desc:<21}{percentage:3.0f}%|{bar:15}{r_bar}"
+log = logging.getLogger('log')
 
 # prevent urllib DEBUG connectionpool logs from nsepython requests
 logging.getLogger('urllib3').setLevel(logging.WARNING)
@@ -16,8 +20,6 @@ logging.getLogger('urllib3').setLevel(logging.WARNING)
 headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:74.0) Gecko/20100101 Firefox/74.0'
 }
-
-
 
 def nse_json(url: str):
     """Fetch json from nse for the url provided"""
@@ -40,39 +42,21 @@ def nse_json(url: str):
 def get_nse_syms(onlyWithHist: bool=True) -> pd.DataFrame:
     """Generates symbols for nse with expiry months having lots"""
 
-    url = "https://www1.nseindia.com/content/fo/fo_mktlots.csv"
+    # get symbols url
+    url = "https://www.nseindia.com/api"
+    url = url + "/equity-stockIndices?index=SECURITIES%20IN%20F%26O"
 
-    try:
-        req = requests.get(url)
-        if req.status_code == 404:
-            print(f"\n{url} URL contents not correct. 404 error!")
-        df_syms = pd.read_csv(StringIO(req.text))
-    except requests.ConnectionError as e:
-        print(f"Connection Error {e}")
-    except pd.errors.ParserError as e:
-        print(f"Parser Error {e}")
+    # get the json for stocks
+    njs = nse_json(url)
+    equities = [njs['data'][x]['symbol'] for x in range(len(njs['data']))]
+    indexes = ['NIFTY','NIFTYIT','BANKNIFTY']
+    nselist = indexes + equities
 
-    df_syms = df_syms[list(df_syms)[1:5]]
-
-    # strip whitespace from columns and make it lower case
-    df_syms.columns = df_syms.columns.str.strip().str.lower()
-
-    # strip all string contents of whitespaces
-    df_syms = df_syms.applymap(lambda x: x.strip()
-                                        if type(x) is str else x)
-
-    # remove 'Symbol' row
-    df_syms = df_syms[df_syms.symbol != "Symbol"]
-
-    # drop symbols not able to generate history!
-    if onlyWithHist:
-        searchfor = ['MIDCPNIFTY', 'FINNIFTY']
-        drop_me = df_syms[df_syms.symbol.str.contains('|'.join(searchfor))].index
-        df_syms.drop(drop_me, inplace=True)
+    df_syms = pd.DataFrame({'symbol': nselist})
 
     # introduce `secType`
     df_syms.insert(1, 'secType', 
-                   np.where(df_syms.symbol.str.contains('NIFTY'), 'IND', 'STK'))
+                    np.where(df_syms.symbol.str.contains('NIFTY'), 'IND', 'STK'))
 
     # introduce `exchange`
     df_syms.insert(2, 'exchange', 'NSE')
@@ -122,6 +106,36 @@ def get_nse_chain(symbol: str) -> pd.DataFrame:
 
         return df
 
+def make_chains(df_syms: pd.DataFrame, savepath: str = '') -> pd.DataFrame:
+    """Generates option chains for all NSE F&Os with live prices"""
+    dfs = []
+    tq_scripts = tqdm(df_syms.symbol, bar_format = BAR_FORMAT)
+
+    for s in tq_scripts:
+        tq_scripts.set_description(f"{s}")
+        try:
+            dfs.append(get_nse_chain(s))
+        except KeyError as e:
+            log.error(f"{s} has error {e}")
+
+    # assemble the chains
+    nse_chains = pd.concat(dfs, ignore_index=True)
+
+    # get the dtes for the chains
+    exchange = df_syms.exchange.iloc[0]
+    dte = nse_chains.expiry.apply(lambda x: get_dte(x, exchange))
+
+    # insert the dtes
+    try:
+        nse_chains.insert(5, 'dte', dte)
+    except ValueError:
+        log.warning('dte already in nse_chains, will be refreshed')
+        nse_chains = nse_chains.assign(dte=dte)
+
+    if savepath:
+        nse_chains.to_json(savepath, dtate_format = 'iso')
+
+    return nse_chains
 
 
 def get_nse_hist(symbol: str, 
@@ -279,8 +293,10 @@ def get_prices() -> pd.DataFrame:
 
 
 if __name__ == "__main__":
-    df = get_nse_syms()
-    # df = get_nse_chain('NIFTY')
+    # df = get_nse_syms()
+    # df = get_nse_chain('SBIN')
     # df = get_nse_hist('M&M', True, 365)
+
+    df = make_chains(pd.DataFrame({'symbol': ['RELIANCE', 'INFY']}).assign(exchange='NSE'))
 
     print(df)
