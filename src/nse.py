@@ -133,7 +133,7 @@ def make_chains(df_syms: pd.DataFrame, savepath: str = '') -> pd.DataFrame:
         nse_chains = nse_chains.assign(dte=dte)
 
     if savepath:
-        nse_chains.to_json(savepath, dtate_format = 'iso')
+        nse_chains.to_json(savepath, date_format = 'iso')
 
     return nse_chains
 

@@ -378,6 +378,27 @@ def get_rsi(df_ohlcs: pd.DataFrame, # df with ascending series of close, indexed
     return rsi
 
 
+def dates_split(start_date: datetime.date, 
+                end_date: datetime.date, 
+                intv: int=50) -> tuple:    
+    """Splits dates into tuples of intervals"""
+
+
+    if end_date < start_date:
+        logging.error(f"End date:{end_date} cannot be earlier than Start date:{start_date} ")
+        return None
+
+    blks = ((end_date - start_date)/intv).days
+
+    for _ in range(blks):
+        end = start_date + datetime.timedelta(days=intv)
+        yield (start_date, end)
+        start_date = end + datetime.timedelta(days=1)
+    
+    # the last chunk
+    if start_date < end_date:
+        yield (start_date, end_date)
+
 
 if __name__ == "__main__":
 
