@@ -19,7 +19,7 @@ handlers:
     when: midnight
     backupCount: 0
     interval: 1
-    filename: ../logs/ib.log
+    filename: /logs/ib.log
 
 loggers:
   ib_log:

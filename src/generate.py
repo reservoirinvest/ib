@@ -127,8 +127,8 @@ if __name__ == "__main__":
     ## Chains....
     ## ***********
 
-    df_chains = make_chains(pd.DataFrame(df_syms), 
-                            savepath=datapath / 'nse_chains.pkl')
+    # df_chains = make_chains(pd.DataFrame(df_syms), 
+    #                         savepath=datapath / 'nse_chains.pkl')
     logging.info('Chains made') 
 
     df_chains = pd.read_pickle(datapath / 'nse_chains.pkl')
@@ -136,10 +136,10 @@ if __name__ == "__main__":
     ## History...
     ## ***********
 
-    df_hist = make_history(df_syms, savepath=datapath / 'nse_hists.pkl')
-    logging.info('Histores made')
+    # df_hist = make_history(df_syms, savepath=datapath / 'nse_hists.pkl')
+    # logging.info('Histories made')
 
-    df_hist = pd.read_pickle(datapath / 'nse_hists.pkl')
+    # df_hist = pd.read_pickle(datapath / 'nse_hists.pkl')
     
     ## Underling margins...
     ## ***********

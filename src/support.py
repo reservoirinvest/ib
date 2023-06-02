@@ -1,3 +1,5 @@
+# support functions common to nse and snp
+
 import asyncio
 import datetime
 import logging

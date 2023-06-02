@@ -1,12 +1,22 @@
+# contains all functions specific to nse
+
+# !!! to-do
+# [] remove nse_optionchain_scrapper dependency
+# [] remove get_history dependancy. Make your own!
+# [] compute targets from standard deviations.
+# [] compute margins
+# [] set prices
+# [] check positions
+# [] place trades
+
 import logging
 from datetime import datetime, timedelta
-from io import StringIO
 
 import numpy as np
 import pandas as pd
 import requests
 from nsepy import get_history
-from nsepython import nse_get_fno_lot_sizes, nse_optionchain_scrapper
+from nsepython import nse_optionchain_scrapper
 from tqdm import tqdm
 
 from support import nse2ib_symbol_convert, get_dte
@@ -20,6 +30,76 @@ logging.getLogger('urllib3').setLevel(logging.WARNING)
 headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:74.0) Gecko/20100101 Firefox/74.0'
 }
+
+def nse_get_fno_lot_sizes(
+        symbol: str = '', 
+        dt: str = pd.to_datetime('today')):
+    """
+    gets fno lot size for nse
+
+    :param symbol: <str>. Needs NSE friendly symbol
+    :param dt: <str>. Date of expiry - e.g. 'Jan-2023'.
+               Converts to pd period M.   
+               Gives all expiries if left blank.
+
+    :returns:  
+
+       if symbol, dt is provided - returns lotsize in int 
+       else returns pd dataframe
+
+    """
+
+    url="https://archives.nseindia.com/content/fo/fo_mktlots.csv"
+
+    if dt:
+        try:
+            dt = pd.to_datetime(dt).to_period('M')
+        except Exception:
+            log.error(f"cannot figure out what dt = '{dt}' means for {symbol}")
+            dt = ''
+
+    payload = pd.read_csv(url)
+
+    lots_df = payload[list(payload)[1:5]]
+
+    # strip whitespace from columns and make it lower case
+    lots_df.columns = lots_df.columns.str.strip().str.lower() 
+
+    # strip all string contents of whitespaces
+    lots_df = lots_df.applymap(lambda x: x.strip() if type(x) is str else x)
+
+    # remove 'Symbol' row
+    lots_df = lots_df[lots_df.symbol != 'Symbol']
+
+    # melt the expiries into rows
+    lots_df = lots_df.melt(id_vars=['symbol'], var_name='expiryM', value_name='lot').dropna()
+
+    # remove rows without lots
+    lots_df = lots_df[~(lots_df.lot == '')]
+
+    # convert expiry to period
+    lots_df = lots_df.assign(expiryM=pd.to_datetime(lots_df.expiryM, format='%b-%y').dt.to_period('M'))
+
+    # convert lots to integers
+    lots_df = lots_df.assign(lot=pd.to_numeric(lots_df.lot, errors='coerce'))
+    
+    # convert & to %26
+    lots_df = lots_df.assign(symbol=lots_df.symbol.str.replace('&', '%26'))
+    
+    output = lots_df.reset_index(drop=True)
+
+    if symbol:
+        output = output.loc[output.symbol == symbol]
+        if dt:
+            output = output.loc[output.expiryM == dt]
+        
+        if output.empty:
+            output = np.nan
+        elif len(output) == 1:
+            output = output.lot.iloc[0]
+
+    return output
+
 
 def nse_json(url: str):
     """Fetch json from nse for the url provided"""
@@ -98,7 +178,21 @@ def get_nse_chain(symbol: str) -> pd.DataFrame:
                 }
 
         df = df.rename(columns=colmap)[colmap.values()]
-        df = df.assign(lot=nse_get_fno_lot_sizes(symbol=symbol))
+
+        # map the lots
+
+        df_lots = nse_get_fno_lot_sizes()
+        df['expiryM'] = pd.to_datetime(df.expiry, format='%b-%y').dt.to_period('M')
+
+        map_cols = ['symbol', 'expiryM']
+
+        df = df.set_index(map_cols) \
+        .join(df_lots.set_index(map_cols)) \
+        .reset_index() \
+        .drop('expiryM', axis=1)
+
+        # df = df.assign(lot=nse_get_fno_lot_sizes(symbol=symbol))
+
         df = df.assign(opt_iv = df.opt_iv/100)
         df = df.assign(right=df.right.str[:1])
         df = df.sort_values(['expiry', 'right', 'strike'], 
@@ -294,9 +388,10 @@ def get_prices() -> pd.DataFrame:
 
 if __name__ == "__main__":
     # df = get_nse_syms()
-    # df = get_nse_chain('SBIN')
-    # df = get_nse_hist('M&M', True, 365)
-
-    df = make_chains(pd.DataFrame({'symbol': ['RELIANCE', 'INFY']}).assign(exchange='NSE'))
+    # df = nse_get_fno_lot_sizes()
+    # df = get_nse_chain('NIFTY')
+    df = make_chains(pd.DataFrame({'symbol': ['RELIANCE', 'NIFTY']}).assign(exchange='NSE'))
+    # df = get_nse_hist('M&M', True, 365) # !!! Not working !!!
+    
 
     print(df)
