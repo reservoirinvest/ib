@@ -8,7 +8,7 @@ import requests
 from nsepy import get_history
 from nsepython import nse_get_fno_lot_sizes, nse_optionchain_scrapper
 
-from support import nse2ib_symbol_convert
+# from nse import nse2ib_symbol_convert
 
 # prevent urllib DEBUG connectionpool logs from nsepython requests
 logging.getLogger('urllib3').setLevel(logging.WARNING)
@@ -16,6 +16,15 @@ logging.getLogger('urllib3').setLevel(logging.WARNING)
 headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:74.0) Gecko/20100101 Firefox/74.0'
 }
+
+def nse2ib_symbol_convert(s: str) -> str:
+    """Convert NSE symbols to IB compatible symbols"""
+    
+    res = s[:9].replace("&", "")
+    if res == 'NIFTY':
+        res = 'NIFTY50'
+
+    return res
 
 def nse_json(url: str):
     """Fetch json from nse for the url provided"""
@@ -278,8 +287,8 @@ def get_prices() -> pd.DataFrame:
 
 
 if __name__ == "__main__":
-    df = get_nse_syms()
-    df = get_nse_chain('SBIN')
-    # df = get_nse_hist('M&M', True, 365)
+    # df = get_nse_syms()
+    # df = get_nse_chain('SBIN')
+    df = get_nse_hist('M&M', True, 365)
 
     print(df)

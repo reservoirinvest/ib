@@ -110,7 +110,7 @@ index_end_date = end_date.strftime('%d-%b-%Y')
 
 if __name__ == "__main__":
 
-    ## ... for Equity history
+    # !!! ... for Equity history NOT WORKING
     # eq_result = requests.get(raw_eq_hist_io, 
     #                       headers=eq_headers).json()
     # print(f"\n raw_eq_history_io = {raw_eq_hist_io}\n\neq_result = {eq_result}")
@@ -120,15 +120,20 @@ if __name__ == "__main__":
 
     ###----------------------------------------------------------
 
-    ## ... for option history
-    ## gives list output ['27-Apr-2023', '25-May-2023', '29-Jun-2023']
-    # expiry = expiry_list(symbol=symbol) 
-    # expiry= expiry[0]
+    # ... for option history
+    # gives list output ['27-Apr-2023', '25-May-2023', '29-Jun-2023']
+    expiry = expiry_list(symbol=symbol) 
 
-    # opt_history = derivative_history_virgin(symbol=symbol, start_date=opt_start_date, 
-    #                                         end_date=opt_end_date, instrumentType=instrumentType, 
-    #                                         expiry_date=expiry, strikePrice=strike, optionType=right)
-    # print(opt_history)
+    print(f"\nExpiries: {expiry}\n\n") # !!! test print
+
+    expiry= expiry[2] # Select one of the expiries
+
+    opt_history = derivative_history_virgin(symbol=symbol, start_date=opt_start_date, 
+                                            end_date=opt_end_date, instrumentType=instrumentType, 
+                                            expiry_date=expiry, strikePrice=strike, optionType=right)
+
+    
+    print(opt_history)
 
     # opt_result = requests.get(raw_opt_eq_hist_io, 
     #                       headers=opt_headers).json()
@@ -158,6 +163,6 @@ if __name__ == "__main__":
     #                                         expiry_date=expiry, strikePrice=strike, optionType='Put')
     # print(index_opt_history)
 
-    result = requests.get(raw_opt_index_hist_io, 
-                          headers=headers)
-    print(result)
+    # result = requests.get(raw_opt_index_hist_io, 
+    #                       headers=headers)
+    # print(result)

@@ -1,7 +1,6 @@
 # contains all functions specific to nse
 
 # !!! to-do
-# [] remove nse_optionchain_scrapper dependency
 # [] remove get_history dependancy. Make your own!
 # [] compute targets from standard deviations.
 # [] compute margins
@@ -16,13 +15,14 @@ import numpy as np
 import pandas as pd
 import requests
 from nsepy import get_history
-from nsepython import nse_optionchain_scrapper
 from tqdm import tqdm
 
-from support import nse2ib_symbol_convert, get_dte
+from support import get_dte
 
 BAR_FORMAT = "{desc:<21}{percentage:3.0f}%|{bar:15}{r_bar}"
 log = logging.getLogger('log')
+
+indices = ['NIFTY','FINNIFTY','BANKNIFTY']
 
 # prevent urllib DEBUG connectionpool logs from nsepython requests
 logging.getLogger('urllib3').setLevel(logging.WARNING)
@@ -30,6 +30,40 @@ logging.getLogger('urllib3').setLevel(logging.WARNING)
 headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:74.0) Gecko/20100101 Firefox/74.0'
 }
+
+def nsefetch(payload):
+    try:
+        output = requests.get(payload,headers=headers).json()
+    except ValueError:
+        s =requests.Session()
+        output = s.get("http://nseindia.com",headers=headers)
+        output = s.get(payload,headers=headers).json()
+    return output
+
+
+def nsesymbolpurify(symbol):
+    symbol = symbol.replace('&','%26') #URL Parse for Stocks Like M&M Finance
+    return symbol
+
+def nse_optionchain_scrapper(symbol):
+    symbol = nsesymbolpurify(symbol)
+    if any(x in symbol for x in indices):
+        payload = nsefetch('https://www.nseindia.com/api/option-chain-indices?symbol='+symbol)
+    else:
+        payload = nsefetch('https://www.nseindia.com/api/option-chain-equities?symbol='+symbol)
+    return payload
+
+
+def nse2ib_symbol_convert(s: str) -> str:
+    """Convert NSE symbols to IB compatible symbols"""
+    
+    res = s[:9].replace("&", "")
+    if res == 'NIFTY':
+        res = 'NIFTY50'
+
+    return res
+
+
 
 def nse_get_fno_lot_sizes(
         symbol: str = '', 
@@ -119,7 +153,7 @@ def nse_json(url: str):
 
 
 
-def get_nse_syms(onlyWithHist: bool=True) -> pd.DataFrame:
+def get_nse_syms() -> pd.DataFrame:
     """Generates symbols for nse with expiry months having lots"""
 
     # get symbols url
@@ -129,8 +163,7 @@ def get_nse_syms(onlyWithHist: bool=True) -> pd.DataFrame:
     # get the json for stocks
     njs = nse_json(url)
     equities = [njs['data'][x]['symbol'] for x in range(len(njs['data']))]
-    indexes = ['NIFTY','NIFTYIT','BANKNIFTY']
-    nselist = indexes + equities
+    nselist = indices + equities
 
     df_syms = pd.DataFrame({'symbol': nselist})
 
@@ -390,7 +423,10 @@ if __name__ == "__main__":
     # df = get_nse_syms()
     # df = nse_get_fno_lot_sizes()
     # df = get_nse_chain('NIFTY')
-    df = make_chains(pd.DataFrame({'symbol': ['RELIANCE', 'NIFTY']}).assign(exchange='NSE'))
+    # df = make_chains(pd.DataFrame({'symbol': ['RELIANCE', 'NIFTY']}).assign(exchange='NSE'))
+    df = get_prices()
+
+
     # df = get_nse_hist('M&M', True, 365) # !!! Not working !!!
     
 

@@ -283,17 +283,6 @@ def get_chain_margins(ib,
 
 
 
-def nse2ib_symbol_convert(s: str) -> str:
-    """Convert NSE symbols to IB compatible symbols"""
-    
-    res = s[:9].replace("&", "")
-    if res == 'NIFTY':
-        res = 'NIFTY50'
-
-    return res
-
-
-
 def get_und_margins(ib, df_ch: pd.DataFrame, 
                     df_prices: Union[None, pd.DataFrame] = None, 
                     port: int=3000) -> pd.DataFrame:
