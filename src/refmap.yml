@@ -1,0 +1,70 @@
+# for standardizing column names
+
+BAR_FORMAT: "{desc:<21}{percentage:3.0f}%|{bar:15}{r_bar}"
+
+NSE: # For extractions from nseindia.com
+
+  INDICES: ['NIFTY','FINNIFTY','BANKNIFTY']
+
+  EQUITY:   # Underlying column renames
+    symbol: nse_symbol
+    lastPrice: lastPrice
+    open: Open
+    dayHigh: High
+    dayLow: Low
+
+  EQUITY_HIST:  # Equity History column renames
+    CH_SYMBOL: nse_symbol
+    CH_TIMESTAMP: Date
+    CH_LAST_TRADED_PRICE: lastPrice
+    CH_OPENING_PRICE: Open
+    CH_TRADE_HIGH_PRICE: High
+    CH_TRADE_LOW_PRICE: Low
+    CH_CLOSING_PRICE: Close
+    CH_TOT_TRADED_QTY: TotalTradeQty
+    CH_TOT_TRADED_VAL: TotalTradeVal
+    VWAP: VWAP
+
+
+  INDEX:    # Underlying
+    symbol: nse_symbol
+    last: lastPrice
+    open: Open
+    high: High
+    low: Low    
+
+  INDEX_HIST: # History of Index column renames
+    HistoricalDate: Date
+    INDEX_NAME: symbol
+    OPEN: Open
+    HIGH: High
+    LOW: Low
+    CLOSE: Close
+
+  INDEX_SYM_MAP: # Index symbol map for FnOs
+    NIFTY 50: 'NIFTY'
+    NIFTY BANK: 'BANKNIFTY'
+    INDIA VIX: 'INDIAVIX'
+    NIFTY FIN SERVICE: 'FINNIFTY'
+    NIFTY MIDCAP 50: 'MIDCPNIFTY'
+
+
+  INDEX_HIST_HEADER: # Request header only for Index history
+    Connection: 'keep-alive'
+    sec-ch-ua: '" Not;A Brand";v="99", "Google Chrome";v="91", "Chromium";v="91"'
+    Accept: 'application/json, text/javascript, */*; q=0.01'
+    DNT: '1'
+    X-Requested-With: 'XMLHttpRequest'
+    sec-ch-ua-mobile: '?0'
+    User-Agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.77 Safari/537.36'
+    Content-Type: 'application/json; charset=UTF-8'
+    Origin: 'https://niftyindices.com'
+    Sec-Fetch-Site: 'same-origin'
+    Sec-Fetch-Mode: 'cors'
+    Sec-Fetch-Dest: 'empty'
+    Referer: 'https://niftyindices.com/reports/historical-data'
+    Accept-Language: 'en-US,en;q=0.9,hi;q=0.8'
+
+  HEADER: # Request header for all others (non-Index history)
+    User-Agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:74.0) Gecko/20100101 Firefox/74.0'
+

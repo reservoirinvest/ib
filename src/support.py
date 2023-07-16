@@ -79,13 +79,18 @@ def get_dte(dt: Union[datetime.datetime, datetime.date, str],
 
 
 def pickle_age(data_path: Path) -> dict:
-    """Gets age of the pickles in a dict with relativedelta"""
+    """Gets age of the pickles in a dict.
+    In both relative & absolute times"""
 
     # Get all the pickles in data path provided
     pickles = Path(data_path).glob('*.pkl')
-    d = {f.name: dateutil.relativedelta.relativedelta(datetime.datetime.now(), 
-                 datetime.datetime.fromtimestamp(f.stat().st_mtime)) 
-                      for f in pickles}
+
+    time_now = datetime.datetime.now()
+
+    d = {f.name: {'relative': dateutil.relativedelta.relativedelta(time_now, 
+                    datetime.datetime.fromtimestamp(f.stat().st_mtime)),
+                'absolute': time_now - datetime.datetime.fromtimestamp(f.stat().st_mtime)} 
+                        for f in pickles}
 
     return d
 
@@ -369,26 +374,39 @@ def get_rsi(df_ohlcs: pd.DataFrame, # df with ascending series of close, indexed
     return rsi
 
 
-def dates_split(start_date: datetime.date, 
-                end_date: datetime.date, 
-                intv: int=50) -> tuple:    
-    """Splits dates into tuples of intervals"""
 
-
-    if end_date < start_date:
-        logging.error(f"End date:{end_date} cannot be earlier than Start date:{start_date} ")
-        return None
-
-    blks = ((end_date - start_date)/intv).days
-
-    for _ in range(blks):
-        end = start_date + datetime.timedelta(days=intv)
-        yield (start_date, end)
-        start_date = end + datetime.timedelta(days=1)
+def hist_date_splits(symbol: str,
+                     end_date: datetime.date,
+                     days: int = 365, 
+                     max_records: int = 50, 
+                     nse_style: bool=True):
     
-    # the last chunk
-    if start_date < end_date:
-        yield (start_date, end_date)
+    """Generates date splits"""
+
+    # Computations
+    start_date = end_date - datetime.timedelta(days)
+
+    # ..bin the dates
+    periods = int((end_date-start_date).days/max_records)+1
+    ranged = pd.date_range(start = start_date, end=end_date, periods=periods)
+
+    if nse_style:
+        ranged = ranged.strftime('%d-%m-%Y')
+    else:
+        ranged = ranged.date
+
+    z_bins = zip(ranged[:-1], ranged[1:])
+
+    return z_bins
+
+
+
+def build_url(base_url: str, params: dict) -> str:
+    """Build url from base with query parameters. Preserves `[]`"""
+
+    encoded_params = '&'.join([f"{k}={v}" for k, v in params.items()])
+    url = f"{base_url}?{encoded_params}"
+    return url
 
 
 if __name__ == "__main__":

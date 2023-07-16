@@ -16,28 +16,39 @@ import pandas as pd
 import requests
 from nsepy import get_history
 from tqdm import tqdm
+import yaml
+from typing import Union
 
 from support import get_dte
 
-BAR_FORMAT = "{desc:<21}{percentage:3.0f}%|{bar:15}{r_bar}"
 log = logging.getLogger('log')
-
-indices = ['NIFTY','FINNIFTY','BANKNIFTY']
 
 # prevent urllib DEBUG connectionpool logs from nsepython requests
 logging.getLogger('urllib3').setLevel(logging.WARNING)
 
-headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:74.0) Gecko/20100101 Firefox/74.0'
-}
+# Get constants from YAML file
+with open('refmap.yml', 'rb') as ref:
+    def_dict = yaml.safe_load(ref)
+
+BAR_FORMAT = def_dict['BAR_FORMAT']
+
+INDICES = def_dict['NSE']['INDICES']
+
+HEADERS = def_dict['NSE']['HEADER']
+INDEX_HEADERS = def_dict['NSE']['INDEX_HIST_HEADER']
+
+INDEX_COLS = def_dict['NSE']['INDEX_HIST']
+INDEX_SYM_MAP = def_dict['NSE']['INDEX_SYM_MAP']
+
+EQUITY_HIST = def_dict['NSE']['EQUITY_HIST']
 
 def nsefetch(payload):
     try:
-        output = requests.get(payload,headers=headers).json()
+        output = requests.get(payload,headers=HEADERS).json()
     except ValueError:
         s = requests.Session()
-        output = s.get("http://nseindia.com",headers=headers)
-        output = s.get(payload,headers=headers).json()
+        output = s.get("http://nseindia.com",headers=HEADERS)
+        output = s.get(payload,headers=HEADERS).json()
     return output
 
 
@@ -47,7 +58,7 @@ def nsesymbolpurify(symbol):
 
 def nse_optionchain_scrapper(symbol):
     symbol = nsesymbolpurify(symbol)
-    if any(x in symbol for x in indices):
+    if any(x in symbol for x in INDICES):
         payload = nsefetch('https://www.nseindia.com/api/option-chain-indices?symbol='+symbol)
     else:
         payload = nsefetch('https://www.nseindia.com/api/option-chain-equities?symbol='+symbol)
@@ -63,6 +74,71 @@ def nse2ib_symbol_convert(s: str) -> str:
 
     return res
 
+
+def nse_json(url: str, 
+             data: str = '',
+             HEADERS: str = HEADERS):
+    
+    """
+    Fetch json from nse for the url provided.
+    
+    For index, data has to be provided as a dictionary wrapped in string.
+    """
+
+    if data: # only index has data for request.post
+
+        result = requests.post(url=url, headers=INDEX_HEADERS,  data=str(data)).json()
+        
+        # needs eval to pull dictionary out of string
+        x = eval(list(result.values())[0])
+
+        output = x
+
+    else:
+
+        try:
+            output = requests.get(url, headers=HEADERS, data=data).json()
+
+        except ValueError:
+            s=requests.Session()
+            output = s.get("http://nseindia.com",headers=HEADERS)
+            output = s.get(url,headers=HEADERS, data=data)
+            try:
+                output = output.json()
+            except ValueError:
+                output = None
+
+    return output
+
+
+
+def get_nse_syms() -> pd.DataFrame:
+    """Generates symbols for nse with expiry months having lots"""
+
+    # get symbols url
+    url = "https://www.nseindia.com/api"
+    url = url + "/equity-stockIndices?index=SECURITIES%20IN%20F%26O"
+
+    # get the json for stocks
+    njs = nse_json(url, headers=HEADERS)
+    equities = [njs['data'][x]['symbol'] for x in range(len(njs['data']))]
+    nselist = INDICES + equities
+
+    df_syms = pd.DataFrame({'nse_symbol': nselist})
+
+    # introduce `secType`
+    df_syms.insert(1, 'secType', 
+                    np.where(df_syms.nse_symbol.str.contains('NIFTY'), 'IND', 'STK'))
+
+    # introduce `exchange`
+    df_syms.insert(2, 'exchange', 'NSE')
+
+    # make ib friendly symbols
+    df_syms.insert(1, 'ib_symbol', df_syms.nse_symbol.apply(nse2ib_symbol_convert))
+
+    # df = df_syms.rename(columns={'symbol':'nse_symbol'})
+
+    return df_syms
 
 
 def nse_get_fno_lot_sizes(
@@ -117,8 +193,8 @@ def nse_get_fno_lot_sizes(
     # convert lots to integers
     lots_df = lots_df.assign(lot=pd.to_numeric(lots_df.lot, errors='coerce'))
     
-    # convert & to %26
-    lots_df = lots_df.assign(symbol=lots_df.symbol.str.replace('&', '%26'))
+    # convert & to %26 #!!! is this needed?
+    # lots_df = lots_df.assign(symbol=lots_df.symbol.str.replace('&', '%26'))
     
     output = lots_df.reset_index(drop=True)
 
@@ -133,52 +209,6 @@ def nse_get_fno_lot_sizes(
             output = output.lot.iloc[0]
 
     return output
-
-
-def nse_json(url: str):
-    """Fetch json from nse for the url provided"""
-    try:
-        output = requests.get(url,headers=headers).json()
-
-    except ValueError:
-        try:
-            s=requests.Session()
-            output = s.get("http://nseindia.com",headers=headers)
-            output = s.get(url,headers=headers).json()
-
-        except ValueError: # for csv loads generating JSONDecodeError
-            output = requests.get(url).text
-        
-    return output
-
-
-
-def get_nse_syms() -> pd.DataFrame:
-    """Generates symbols for nse with expiry months having lots"""
-
-    # get symbols url
-    url = "https://www.nseindia.com/api"
-    url = url + "/equity-stockIndices?index=SECURITIES%20IN%20F%26O"
-
-    # get the json for stocks
-    njs = nse_json(url)
-    equities = [njs['data'][x]['symbol'] for x in range(len(njs['data']))]
-    nselist = indices + equities
-
-    df_syms = pd.DataFrame({'symbol': nselist})
-
-    # introduce `secType`
-    df_syms.insert(1, 'secType', 
-                    np.where(df_syms.symbol.str.contains('NIFTY'), 'IND', 'STK'))
-
-    # introduce `exchange`
-    df_syms.insert(2, 'exchange', 'NSE')
-
-    # make ib friendly symbols
-    df_syms.insert(1, 'ib_sym', df_syms.symbol.apply(nse2ib_symbol_convert))
-
-    return df_syms
-
 
 
 def get_nse_chain(symbol: str) -> pd.DataFrame:
@@ -224,19 +254,21 @@ def get_nse_chain(symbol: str) -> pd.DataFrame:
         .reset_index() \
         .drop('expiryM', axis=1)
 
-        # df = df.assign(lot=nse_get_fno_lot_sizes(symbol=symbol))
-
         df = df.assign(opt_iv = df.opt_iv/100)
         df = df.assign(right=df.right.str[:1])
         df = df.sort_values(['expiry', 'right', 'strike'], 
                         ascending=[True, False, True]).reset_index(drop=True)
+        
+        df = df.rename(columns={'symbol': 'nse_symbol'})
 
         return df
 
-def make_chains(df_syms: pd.DataFrame, savepath: str = '') -> pd.DataFrame:
+
+def make_chains(symbols: Union[pd.Series, list], savepath: str = '') -> pd.DataFrame:
     """Generates option chains for all NSE F&Os with live prices"""
+
     dfs = []
-    tq_scripts = tqdm(df_syms.symbol, bar_format = BAR_FORMAT)
+    tq_scripts = tqdm(symbols, bar_format = BAR_FORMAT)
 
     for s in tq_scripts:
         tq_scripts.set_description(f"{s}")
@@ -249,7 +281,7 @@ def make_chains(df_syms: pd.DataFrame, savepath: str = '') -> pd.DataFrame:
     nse_chains = pd.concat(dfs, ignore_index=True)
 
     # get the dtes for the chains
-    exchange = df_syms.exchange.iloc[0]
+    exchange = 'NSE'
     dte = nse_chains.expiry.apply(lambda x: get_dte(x, exchange))
 
     # insert the dtes
@@ -259,93 +291,70 @@ def make_chains(df_syms: pd.DataFrame, savepath: str = '') -> pd.DataFrame:
         log.warning('dte already in nse_chains, will be refreshed')
         nse_chains = nse_chains.assign(dte=dte)
 
+    nse_chains = nse_chains.rename(columns={'symbol':'nse_symbol'})
+
     if savepath:
-        nse_chains.to_json(savepath, date_format = 'iso')
+        nse_chains.to_pickle(savepath)
 
     return nse_chains
-
-
-def get_nse_hist(symbol: str, 
-        is_index: bool,
-        days: int=365 ) -> pd.DataFrame:
-    
-    end = datetime.now().date()
-    start = end-timedelta(days=days)
-    cols = {'Date': 'date',
-            'Open': 'open',
-            'High': 'high',
-            'Low': 'low',
-            'Close': 'close',
-            'Volume': 'volume',
-            'Turnover': 'turnover',
-            'Symbol': 'symbol',
-            'Series': 'series',
-            'Prev Close': 'prev_cls',
-            'Last': 'last',
-            'VWAP': 'vwap',
-            'Trades': 'trades',
-            'Deliverable Volume': 'd_volume',
-            '%Deliverble': 'pct_delv'}
-
-    # call
-    data = get_history(symbol=symbol, start=start, end=end, index=is_index).reset_index()
-
-    if data.empty:
-            logging.error(f'Could not generate history for {symbol}')
-            data = None 
-            return data
-
-    data.insert(0, 'date', data.Date.apply(pd.to_datetime)) 
-    data.drop('Date', axis=1, inplace=True) # remove old Date field
-
-    # convert to end of day India time
-    date=(data.date + pd.Timedelta(hours=16)).dt.tz_localize('Asia/Calcutta')
-    data = data.assign(date=date)
-
-    # if index, put in symbol column
-    if is_index:
-            data.insert(0, 'Symbol', symbol)
-
-    data.rename(columns=cols, inplace=True)
-
-    return data
-
 
 
 def clean_prices(df: pd.DataFrame) -> pd.DataFrame:
     "Cleans up NSE prices to give numeric values and times"
 
-    # stage a numeric df, removing commas from price text
+    # stage a `mother` numeric df, removing commas from price text
     df = df.apply(lambda x: 
-                  pd.to_numeric(x.astype(str).str.replace(',',''), 
+                    pd.to_numeric(x.astype(str).str.replace(',',''), 
                                 errors='ignore'))
-    df2 = df.apply(pd.to_numeric, errors='coerce')
-    df2 = df2.dropna(axis=1, how='all') \
-          .drop(columns=['timeVal', 'percChange', 'indexOrder'], errors='ignore')
 
-    # Prep the mother df
-    df1 = df.drop(columns=list(df2.columns))
+    df = df.dropna(axis=1)
 
-    # convert xDt to date dict
-    try: # to get equityies only
-        s = pd.Series(df.xDt.unique())
-        di = pd.to_datetime(s, errors='coerce').set_axis(s).to_dict()
-        df1 = df1.assign(xDt = df1.xDt.map(di))
-    except AttributeError:
-        pass
+    # remove unnecessary columns if present
+    searchfor = '|'.join(['meta', 'chart', 'indexOrder', 'timeVal', 
+                        'percChange', 'identifier'])
+    col_loc = ~df.columns.str.contains(searchfor)
+    df = df.loc[:, col_loc]
 
-    df_final = pd.concat([df1, df2], axis=1)
+    # protect the texts
+    protect_cols = ['symbol', 'series']
 
-    return df_final
+    df_clean = df.drop(protect_cols, axis=1, errors="ignore")
 
+    # Make the datetimes
+    date_cols = [s for s in df_clean.columns if 'date' in s]
+    df_dates = df[date_cols].apply(pd.to_datetime, axis=1, errors='coerce')
+
+    # Make the numerics
+    df_nums = df[df_clean.columns.difference(df_dates.columns)]\
+                        .apply(pd.to_numeric, errors='coerce', axis=1)\
+                            .dropna(axis=1)
+
+    # Join outputs
+    df_out = df.loc[:, df.columns.difference(df_clean.columns)].join(df_dates).join(df_nums)
+
+    df_out = df_out.rename(columns={'symbol': 'nse_symbol'})
+
+    return df_out
 
 
 def equity_prices() -> pd.DataFrame:
     """Gets all live equity prices"""
 
-    url = "https://www1.nseindia.com/live_market/dynaContent/live_watch/stock_watch/foSecStockWatch.json"
+    url1 = "https://www.nseindia.com/api"
+    url1 = url1 + "/equity-stockIndices?index=SECURITIES%20IN%20F%26O"
 
-    js = nse_json(url)
+    # this url does not work outside market hours. #!!! check if this is faster
+    url2 = "https://www1.nseindia.com/live_market/dynaContent/live_watch/stock_watch/foSecStockWatch.json"
+
+
+    for u in [url1, url2]:
+
+        js = nse_json(u)
+
+        if js:
+            break
+
+    # make df of equity_prices
     x = []
 
     for item in js['data']:
@@ -376,28 +385,14 @@ def index_prices(important: bool = True) -> pd.DataFrame:
     df = df[(df.indexType == 'eq') & (df.yearHigh != '-')].reset_index(drop=True)
 
     # symbol map for fno index (except `INDIAVIX`)
-    di = {'NIFTY 50': 'NIFTY', 'NIFTY BANK': 'BANKNIFTY', 'INDIA VIX': 
-          'INDIAVIX', 'NIFTY FIN SERVICE': 'FINNIFTY',
-          'NIFTY MIDCAP 50': 'MIDCPNIFTY',}
-    df.insert(0, 'symbol', df.indexName.map(di).fillna(df.indexName))
+    df.insert(0, 'symbol', df.indexName.map(INDEX_SYM_MAP).fillna(df.indexName))
 
     if important:
-        df = df[df.symbol.isin(di.values())]
+        df = df[df.symbol.isin(INDEX_SYM_MAP.values())]
 
     df = clean_prices(df) # handle obj -> numerics, times
 
     return df
-
-
-
-def is_nse_open() -> bool:
-    """Gives a True if nse is open"""
-
-    url = 'https://nseindia.com/api/marketStatus'
-    js = nse_json(url) # works!
-    nse_is_open = js[list(js.keys())[0]][0]['marketStatus'] != 'Closed'
-
-    return nse_is_open
 
 
 
@@ -407,27 +402,83 @@ def get_prices() -> pd.DataFrame:
     df_eq = equity_prices()
     df_ix = index_prices()
 
-    df = pd.concat([df_eq, df_ix], ignore_index=True)
-    ltp = df['last'].combine_first(df.ltP)
-    df = df.assign(last=ltp, ltP=ltp)
+    # Do column conversions to standardize
+    with open('refmap.yml', 'rb') as ref:
+        def_dict = yaml.safe_load(ref)
+        
+    eq_cols_dict = def_dict['NSE']['EQUITY']
+    ix_cols_dict = def_dict['NSE']['INDEX']
 
-    # harmonize time to time value
-    df.timeVal = pd.to_datetime(df.timeVal).dt.tz_localize('Asia/Calcutta')
-    df.timeVal = df.timeVal.max()
+    df_e = df_eq.rename(columns=eq_cols_dict).loc[:, eq_cols_dict.values()]
+    df_i = df_ix.rename(columns=ix_cols_dict).loc[:, ix_cols_dict.values()]
+
+    df = pd.concat([df_e, df_i], ignore_index=True)
+    df['localTime'] = pd.Timestamp.now(tz='Asia/Calcutta')
 
     return df
+
+
+
+def clean_index_hist(x: dict, index_columns: str=INDEX_COLS) -> pd.DataFrame:
+        
+        """Cleans index json history and makes it df"""
+
+        df = pd.DataFrame.from_records(x)
+
+        # clean the column names
+        df1 = df.iloc[:, 1:].rename(columns=index_columns)
+
+        # clean the column types
+        df2 = df1.iloc[:, 1].apply(pd.to_datetime)
+        df2 = (df2 + pd.Timedelta(hours=16)).dt.tz_localize('Asia/Calcutta')
+
+        df3 = df1.iloc[:, 2:].apply(pd.to_numeric)
+        df4 = pd.concat([df1.iloc[:, 0], df2, df3], axis=1)
+
+        # symbol map for fnos (except `INDIAVIX`)
+        df4.insert(0, 'nse_symbol', df4.symbol.map(INDEX_SYM_MAP).fillna(df4.symbol))
+
+        return df4
+
+
+
+def clean_eq_hist(eq_json: dict, cols = EQUITY_HIST) -> pd.DataFrame:
+
+    """Cleans equity json history and makes it df"""
+
+    x = list(eq_json.values())[0]
+    df = pd.DataFrame.from_records(x)
+
+    EQUITY_HIST = def_dict['NSE']['EQUITY_HIST']
+    df = df[EQUITY_HIST.keys()]
+    df = df.rename(columns=EQUITY_HIST)
+    df = df.assign(Date=(pd.to_datetime(df.Date)+ pd.Timedelta(hours=16))\
+                .dt.tz_localize('Asia/Calcutta'))
+    
+    return df
+
+
+def is_nse_open() -> bool:
+
+    """Gives a True if nse is open"""
+
+    url = 'https://nseindia.com/api/marketStatus'
+    js = nse_json(url) # works!
+    nse_is_open = js[list(js.keys())[0]][0]['marketStatus'] not in ['Close', 'Closed']
+
+    return nse_is_open
 
 
 
 if __name__ == "__main__":
     # df = get_nse_syms()
     # df = nse_get_fno_lot_sizes()
-    # df = get_nse_chain('NIFTY')
-    # df = make_chains(pd.DataFrame({'symbol': ['RELIANCE', 'NIFTY']}).assign(exchange='NSE'))
-    df = get_prices()
+    # df = get_nse_chain('SBIN')
+    # df = make_chains(pd.Series(['NIFTY', 'SBIN']))
+    # df = equity_prices()
+    # df = index_prices()
+    # df = get_prices()
 
-
-    # df = get_nse_hist('M&M', True, 365) # !!! Not working !!!
     
 
     print(df)

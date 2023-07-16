@@ -287,8 +287,8 @@ def get_prices() -> pd.DataFrame:
 
 
 if __name__ == "__main__":
-    # df = get_nse_syms()
+    df = get_nse_syms()
     # df = get_nse_chain('SBIN')
-    df = get_nse_hist('M&M', True, 365)
+    # df = get_nse_hist('M&M', True, 365)
 
     print(df)
