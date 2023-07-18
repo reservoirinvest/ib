@@ -375,8 +375,7 @@ def get_rsi(df_ohlcs: pd.DataFrame, # df with ascending series of close, indexed
 
 
 
-def hist_date_splits(symbol: str,
-                     end_date: datetime.date,
+def hist_date_splits(end_date: datetime.date,
                      days: int = 365, 
                      max_records: int = 50, 
                      nse_style: bool=True):
@@ -387,7 +386,7 @@ def hist_date_splits(symbol: str,
     start_date = end_date - datetime.timedelta(days)
 
     # ..bin the dates
-    periods = int((end_date-start_date).days/max_records)+1
+    periods = days // max_records + (days % max_records > 0) + 1
     ranged = pd.date_range(start = start_date, end=end_date, periods=periods)
 
     if nse_style:
@@ -395,7 +394,7 @@ def hist_date_splits(symbol: str,
     else:
         ranged = ranged.date
 
-    z_bins = zip(ranged[:-1], ranged[1:])
+    z_bins = list(zip(ranged[:-1], ranged[1:]))
 
     return z_bins
 

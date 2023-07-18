@@ -41,6 +41,7 @@ INDEX_COLS = def_dict['NSE']['INDEX_HIST']
 INDEX_SYM_MAP = def_dict['NSE']['INDEX_SYM_MAP']
 
 EQUITY_HIST = def_dict['NSE']['EQUITY_HIST']
+OPT_HIST = def_dict['NSE']['OPT_HIST']
 
 def nsefetch(payload):
     try:
@@ -120,7 +121,7 @@ def get_nse_syms() -> pd.DataFrame:
     url = url + "/equity-stockIndices?index=SECURITIES%20IN%20F%26O"
 
     # get the json for stocks
-    njs = nse_json(url, headers=HEADERS)
+    njs = nse_json(url, HEADERS=HEADERS)
     equities = [njs['data'][x]['symbol'] for x in range(len(njs['data']))]
     nselist = INDICES + equities
 
@@ -231,7 +232,7 @@ def get_nse_chain(symbol: str) -> pd.DataFrame:
         df[int_cols] = df[int_cols].astype('int64')
         df['expiryDate'] = pd.to_datetime(df.expiryDate)
 
-        colmap = { 'underlying': 'symbol', 'expiryDate': 'expiry', 'strikePrice': 'strike',  
+        colmap = {'underlying': 'symbol', 'expiryDate': 'expiry', 'strikePrice': 'strike',  
                 'right': 'right','underlyingValue': 'undPrice', 'openInterest': 'oi',
                 'changeinOpenInterest': 'oiChange', 'pchangeinOpenInterest': 'pChangeOI',
                 'totalTradedVolume': 'volume', 'totalBuyQuantity': 'totalBuyQty', 
@@ -456,6 +457,32 @@ def clean_eq_hist(eq_json: dict, cols = EQUITY_HIST) -> pd.DataFrame:
                 .dt.tz_localize('Asia/Calcutta'))
     
     return df
+
+
+def clean_opt_hist(opt_json: dict, 
+                      OPT_HIST: dict = OPT_HIST) -> pd.DataFrame:
+    
+    """Cleans option history and makes it a df"""
+    
+    # prepare the mother df
+    x = list(opt_json.values())[0]
+    df = pd.DataFrame.from_records(x)
+
+    OPT_HIST = def_dict['NSE']['OPT_HIST']
+    df = df[OPT_HIST.keys()]
+    df = df.rename(columns=OPT_HIST)
+
+    # clean the dates and numerics
+    df_dates = df.iloc[:, 2:4].apply(pd.to_datetime)
+
+    dte = (df_dates['Expiry'].sub(df_dates['Date']).dt.days)
+    dte.rename('dte', inplace=True)
+
+    df_nums = df.iloc[:, 4:]
+
+    df_out = pd.concat([df.iloc[:, :2], df_dates, dte, df_nums], axis=1)
+
+    return df_out
 
 
 def is_nse_open() -> bool:

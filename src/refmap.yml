@@ -4,9 +4,9 @@ BAR_FORMAT: "{desc:<21}{percentage:3.0f}%|{bar:15}{r_bar}"
 
 NSE: # For extractions from nseindia.com
 
-  INDICES: ['NIFTY','FINNIFTY','BANKNIFTY']
+  INDICES: ['NIFTY','FINNIFTY','BANKNIFTY', 'INDIAVIX', 'MIDCPNIFTY']
 
-  EQUITY:   # Underlying column renames
+  EQUITY:   # Underlying equity column renames
     symbol: nse_symbol
     lastPrice: lastPrice
     open: Open
@@ -21,12 +21,11 @@ NSE: # For extractions from nseindia.com
     CH_TRADE_HIGH_PRICE: High
     CH_TRADE_LOW_PRICE: Low
     CH_CLOSING_PRICE: Close
-    CH_TOT_TRADED_QTY: TotalTradeQty
-    CH_TOT_TRADED_VAL: TotalTradeVal
+    CH_TOT_TRADED_QTY: totalTradeQty
+    CH_TOT_TRADED_VAL: totalTradeVal
     VWAP: VWAP
 
-
-  INDEX:    # Underlying
+  INDEX:    # Underlying index column renames
     symbol: nse_symbol
     last: lastPrice
     open: Open
@@ -41,12 +40,31 @@ NSE: # For extractions from nseindia.com
     LOW: Low
     CLOSE: Close
 
-  INDEX_SYM_MAP: # Index symbol map for FnOs
+  INDEX_SYM_MAP: # Index symbol map for history
     NIFTY 50: 'NIFTY'
     NIFTY BANK: 'BANKNIFTY'
     INDIA VIX: 'INDIAVIX'
     NIFTY FIN SERVICE: 'FINNIFTY'
     NIFTY MIDCAP 50: 'MIDCPNIFTY'
+
+  OPT_HIST: # Option history column renames
+    FH_SYMBOL: nse_symbol
+    FH_OPTION_TYPE: Right
+    FH_TIMESTAMP: Date
+    FH_EXPIRY_DT: Expiry
+    FH_STRIKE_PRICE: Strike
+    FH_LAST_TRADED_PRICE: lastPrice
+    FH_OPENING_PRICE: Open
+    FH_TRADE_HIGH_PRICE: High
+    FH_TRADE_LOW_PRICE: Low
+    FH_CLOSING_PRICE: Close
+    FH_OPEN_INT: oi
+    FH_MARKET_LOT: lot
+    FH_SETTLE_PRICE: settledPrice
+    FH_UNDERLYING_VALUE: undPrice
+    FH_TOT_TRADED_QTY: totalTradeQty
+    FH_TOT_TRADED_VAL: totalTradeVal
+    CALCULATED_PREMIUM_VAL: calcPremium
 
 
   INDEX_HIST_HEADER: # Request header only for Index history
@@ -67,4 +85,25 @@ NSE: # For extractions from nseindia.com
 
   HEADER: # Request header for all others (non-Index history)
     User-Agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:74.0) Gecko/20100101 Firefox/74.0'
+
+
+  # Option Expiry dates for date.weekday()
+  # or trading holiday, fno expires the day before
+  EXPIRY_DAY_OLD: &old_expiry  # before 14-July-2023
+    OLD_DATE: '20230714' # Date when the change was made in %Y%m%d format
+    FINNIFTY: 1     # Tuesdays
+    INDIAVIX: 1     # Tuesdays. No option trading yet
+    MIDCPNIFTY: 2   # Wednesdays
+    EQUITIES: 3     # Thursdays
+    NIFTY: 4        # Fridays
+    BANKNIFTY: 4    # Fridays
+
+  EXPIRY_DAY:
+    <<: *old_expiry # copy the previous old_expiry expiry configuration
+    EQUITIES: 4     # Fridays. Over-writes the old
+
+  # Abnormal expiry dates in changed from: to format
+  # %Y%m%d format
+  ABNORMAL:
+    '20230629': '20230628' # Bakri-Id adjustment
 
