@@ -1,0 +1,38 @@
+MARKET: SNP
+
+LOGLEVEL: ERROR
+
+MAX_FILE_AGE: 1
+MAX_DTE: 60
+
+# SNP ports and client IDs
+PORT: 1300
+PAPER: 1301
+
+CID: 10
+
+MINCUSHION: 0.3 # 30% minimum cushion for responsible marging trading. Higher the better.
+
+COVER_ME: True
+COVER_MIN_DTE: 4
+
+COVER_STD_MULT: 0.5
+COVXPMULT: 2 # multiple for cover expected price
+
+SOW_NAKEDS: True
+VIRGIN_DTE: 7 # minimum days to expiration for nakeds
+
+VIRGIN_PUT_STD_MULT: 1
+VIRGIN_CALL_STD_MULT: 3
+NAKEDXPMULT: 2  # multiple for naked expected price
+MINNAKEDOPTPRICE: 2 # To ensure we get at least this much from naked puts
+
+VIRGIN_QTY_MULT: 0.015 # 1.5% of NLV divided by margin = qty of virgins
+
+PROTECT_ME: False
+PROTECT_DTE: 35
+PROTECTION_STRIP: 4 # no of strikes down for longs and up for shorts
+
+REAP_ME: True
+REAPRATIO: 0.05 # percentage of average cost. Lower the better.
+MINREAPDTE: 2 # do not reap on or under this DTE.
