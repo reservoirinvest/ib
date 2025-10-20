@@ -1,4 +1,4 @@
-#%%
+#%% 
 # IMPORTS
 
 import asyncio
@@ -70,7 +70,12 @@ def load_config(market: str) -> dict:
     
     return config
 
-def get_ib_connection(market: str = "SNP", account: str = '') -> IB:
+ROOT = here()
+config = load_config("SNP")
+MAX_DTE = config.get("MAX_DTE")
+PORT = config.get("PORT", 1300)
+
+def get_ib_connection(market: str = "SNP", account_no: str = '') -> IB:
     """
     Create and return an IB connection using config settings.
     
@@ -82,27 +87,35 @@ def get_ib_connection(market: str = "SNP", account: str = '') -> IB:
         Connected IB instance
     """
     config = load_config(market)
-    port = config.get("PORT", 1300)
     client_id = config.get("CID", 10)
     
     ib = IB()
-    ib.connect('127.0.0.1', port, clientId=client_id, account=account)
-    print(f"Connected to IB on port {port} with client ID {client_id} (market: {market}, account: {account or 'default'})")
+    ib.connect('127.0.0.1', PORT, clientId=client_id, account=account_no)
+    print(f"Connected to IB on port {PORT} with client ID {client_id} (market: {market}, account: {account_no or 'default'})")
     
     return ib
+
+def get_safe_ib_connection(client_id, max_retries=3):
+    """Create a new IB connection with retry logic."""
+    for attempt in range(max_retries):
+        try:
+            ib = IB()
+            ib.connect('127.0.0.1', PORT, clientId=client_id)  # Use TWS paper trading port
+            if ib.isConnected():
+                return ib
+            print(f"Connection attempt {attempt + 1} failed: Not connected")
+        except Exception as e:
+            print(f"Connection attempt {attempt + 1} failed: {str(e)}")
+            time.sleep(2)
+    raise ConnectionError(f"Failed to connect to IB after {max_retries} attempts")
 
 #%%
 # CONSTANTS
 
-ROOT = here()
 USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
 SNP_URL = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
 WEEKLYS_URL = "http://www.cboe.com/products/weeklys-options/available-weeklys"
 ADDITIONAL_SYMBOLS = ["QQQ", "SPY"]
-
-config = load_config("SNP")
-MAX_DTE = config.get("MAX_DTE")
-
 
 #%%
 # Utility functions
@@ -353,7 +366,7 @@ def get_option_symbols(weeklies: bool = True) -> pd.Series:
         logger.error(f"Failed to retrieve option symbols: {e}")
         return pd.Series(ADDITIONAL_SYMBOLS if weeklies else [], dtype=str)
 
-async def _qualify_batch(ib: IB, contracts: list, pbar) -> tuple:
+async def _qualify_batch(ib: IB, contracts: list, pbar=None) -> tuple:
     """Async helper to qualify contracts in batch."""
     qualified = []
     failed = []
@@ -368,16 +381,20 @@ async def _qualify_batch(ib: IB, contracts: list, pbar) -> tuple:
             contract = contracts[i]
             if result:
                 qualified.extend(result)
-                pbar.set_postfix_str(f"✓ {contract.symbol}")
+                if pbar:
+                    pbar.set_postfix_str(f"✓ {contract.symbol}")
             else:
                 failed.append(contract.symbol)
-                pbar.set_postfix_str(f"✗ {contract.symbol}")
+                if pbar:
+                    pbar.set_postfix_str(f"✗ {contract.symbol}")
         except Exception as e:
             contract = contracts[i]
             failed.append(contract.symbol)
-            pbar.set_postfix_str(f"✗ {contract.symbol}: {str(e)[:30]}")
+            if pbar:
+                pbar.set_postfix_str(f"✗ {contract.symbol}: {str(e)[:30]}")
         
-        pbar.update(1)
+        if pbar:
+            pbar.update(1)
     
     return qualified, failed
 
@@ -424,6 +441,61 @@ def qualify_stock_contracts(symbols: pd.Series, market: str = "SNP") -> list:
         if ib and ib.isConnected():
             ib.disconnect()
             print("Disconnected from IB\n")
+
+def qualify_me(
+    ib: IB, 
+    data: list, 
+    desc: str = "Qualifying contracts",
+    batch_size: int = 50
+) -> list:
+    """
+    Qualify a list of contracts with Interactive Brokers using async batch processing.
+    Processes in smaller batches to prevent event loop errors and rate limiting.
+    Removed progress bar to avoid widget CDN issues in restricted environments.
+    """
+    try:
+        # Ensure data is a list
+        contracts = list(data) if isinstance(data, (list, pd.Series)) else data
+
+        qualified = []
+        failed_total = []
+
+        total_contracts = len(contracts)
+        if total_contracts == 0:
+            logger.warning("No contracts to qualify")
+            return []
+
+        # Calculate number of batches
+        num_batches = (total_contracts + batch_size - 1) // batch_size
+        print(f"Qualifying {total_contracts} contracts in {num_batches} batches of up to {batch_size} each...")
+
+        for batch_num in range(num_batches):
+            start_idx = batch_num * batch_size
+            end_idx = min(start_idx + batch_size, total_contracts)
+            batch_contracts = contracts[start_idx:end_idx]
+
+            print(f"\nProcessing batch {batch_num + 1}/{num_batches} ({len(batch_contracts)} contracts)...")
+
+            # Run without progress bar
+            qualified_batch, failed_batch = ib.run(_qualify_batch(ib, batch_contracts, None))  # Pass None for pbar
+
+            qualified.extend(qualified_batch)
+            failed_total.extend(failed_batch)
+
+            if batch_num < num_batches - 1:
+                ib.sleep(1)  # 1-second pause to avoid rate limiting
+
+        print(f"\n✓ Successfully qualified {len(qualified)}/{total_contracts} contracts")
+        if failed_total:
+            print(f"✗ Failed to qualify {len(failed_total)} symbols: {', '.join(failed_total[:10])}")
+            if len(failed_total) > 10:
+                print(f"  ... and {len(failed_total) - 10} more")
+
+        return qualified
+
+    except Exception as e:
+        logger.error(f"Failed to qualify contracts: {e}")
+        return []
 
 def get_qualified_symbols(weeklies: bool = True, market: str = "SNP", save: bool = True) -> list:
     """
@@ -524,7 +596,6 @@ def get_prices(
                 ask = ticker.ask if is_valid_price(ticker.ask) else None
                 last = ticker.last if is_valid_price(ticker.last) else None
                 close = ticker.close if is_valid_price(ticker.close) else None
-                
                 all_price_data.append({
                     'symbol': ticker.contract.symbol,
                     'conId': ticker.contract.conId,
@@ -903,8 +974,6 @@ def get_option_chains(
             for expiry, strike in product(row['expiries'], row['strikes']):
                 expanded_rows.append({
                     'symbol': row['symbol'],
-                    # 'conId': row['conId'],
-                    # 'tradingClass': row['tradingClass'],
                     'expiry': expiry,
                     'strike': strike
                 })
@@ -912,9 +981,6 @@ def get_option_chains(
         # Create final DataFrame
         df_out = pd.DataFrame(expanded_rows)
         df_out['dte'] = get_dte(df_out['expiry'])
-
-        # # Remove 'conId' column from the final DataFrame
-        # df_out = df_out.drop(columns=['conId'], errors='ignore')
 
         return df_out
 
@@ -983,13 +1049,12 @@ def chains_n_unds():
 
     # Get option chains for qualified contracts
     chain_path = ROOT / 'data' / 'df_chains.pkl'
-    if do_i_refresh(my_path=chain_path, max_days=1):
+    df_chains_check = get_pickle(chain_path)
+    if do_i_refresh(my_path=chain_path, max_days=1) or df_chains_check is None or (isinstance(df_chains_check, pd.DataFrame) and df_chains_check.empty):
         df_chains = get_option_chains(qualified_contracts, market="SNP", batch_size=50)
         pickle_me(df_chains, file_path=chain_path)
     else:
         df_chains = get_pickle(path=chain_path)
-
-    # print(df_chains.head(10))
 
     # Get price with volatilities and margins for qualified contracts
     df_unds = get_volatilities_snapshot(qualified_contracts, market="SNP", batch_size=50)
@@ -1009,7 +1074,6 @@ def chains_n_unds():
 
     return df_chains, df_unds
 
-
 #%% 
 # Test functions - Make symbols
 if __name__ == "__main__":
@@ -1023,12 +1087,11 @@ if __name__ == "__main__":
     else:
         qualified_contracts = get_pickle(path=sym_path)
 
-    #%%
     # Get option chains for qualified contracts
     # Note: chains should be run before unds, as unds uses chains for margin calculation
-
-    chain_path = ROOT/'data'/'df_chains.pkl'
-    if do_i_refresh(my_path=chain_path, max_days=1):
+    chain_path = ROOT / 'data' / 'df_chains.pkl'
+    df_chains_check = get_pickle(chain_path)
+    if do_i_refresh(my_path=chain_path, max_days=1) or df_chains_check is None or (isinstance(df_chains_check, pd.DataFrame) and df_chains_check.empty):
         df_chains = get_option_chains(qualified_contracts, market="SNP", batch_size=50)
         pickle_me(df_chains, file_path=chain_path)
     else:
@@ -1036,7 +1099,6 @@ if __name__ == "__main__":
 
     print(df_chains.head(10))
 
-    #%%
     # Get price with volatilities and margins for qualified contracts
     df_unds = get_volatilities_snapshot(qualified_contracts, market="SNP", batch_size=50)
 
@@ -1052,4 +1114,3 @@ if __name__ == "__main__":
 
     print(df_unds[['symbol', 'iv', 'hv', 'margin', 'price']].head(10))
     pickle_me(df_unds, file_path=ROOT/'data'/'df_unds.pkl')
-
