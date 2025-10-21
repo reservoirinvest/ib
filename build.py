@@ -75,7 +75,7 @@ config = load_config("SNP")
 MAX_DTE = config.get("MAX_DTE")
 PORT = config.get("PORT", 1300)
 
-def get_ib_connection(market: str = "SNP", account_no: str = '') -> IB:
+def get_ib_connection(market: str = "SNP", account_no: str = '', msg: bool=False) -> IB:
     """
     Create and return an IB connection using config settings.
     
@@ -91,7 +91,8 @@ def get_ib_connection(market: str = "SNP", account_no: str = '') -> IB:
     
     ib = IB()
     ib.connect('127.0.0.1', PORT, clientId=client_id, account=account_no)
-    print(f"Connected to IB on port {PORT} with client ID {client_id} (market: {market}, account: {account_no or 'default'})")
+    if msg:
+        print(f"Connected to IB on port {PORT} with client ID {client_id} (market: {market}, account: {account_no or 'default'})")
     
     return ib
 
@@ -1031,7 +1032,7 @@ def calculate_atm_margin(row, chains_df, target_dte):
     margin = atm_margin(strike=strike, undPrice=und_price, dte=dte, vy=iv)
     return margin
 
-def chains_n_unds():
+def chains_n_unds(msg: bool = False):
     """
     Processes qualified contracts, option chains, and calculate margins.
     
@@ -1045,7 +1046,7 @@ def chains_n_unds():
         qualified_contracts = get_qualified_symbols(weeklies=True, market="SNP", save=True)
         pickle_me(qualified_contracts, file_path=sym_path)
     else:
-        qualified_contracts = get_pickle(path=sym_path)
+        qualified_contracts = get_pickle(path=sym_path, print_msg=msg)
 
     # Get option chains for qualified contracts
     chain_path = ROOT / 'data' / 'df_chains.pkl'
@@ -1054,7 +1055,7 @@ def chains_n_unds():
         df_chains = get_option_chains(qualified_contracts, market="SNP", batch_size=50)
         pickle_me(df_chains, file_path=chain_path)
     else:
-        df_chains = get_pickle(path=chain_path)
+        df_chains = get_pickle(path=chain_path, print_msg=msg)
 
     # Get price with volatilities and margins for qualified contracts
     df_unds = get_volatilities_snapshot(qualified_contracts, market="SNP", batch_size=50)

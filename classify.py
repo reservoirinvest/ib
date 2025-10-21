@@ -96,7 +96,7 @@ def clean_ib_util_df(
 
 #%%
 # Functions to get financials, portforlio and orders
-def get_ib_portfolio(account: str) -> pd.DataFrame:
+def get_ib_portfolio(account: str, msg: bool=False) -> pd.DataFrame:
     """
     Get the IB portfolio for the specified account and return it as a DataFrame.
     
@@ -134,11 +134,11 @@ def get_ib_portfolio(account: str) -> pd.DataFrame:
     finally:
         if ib and ib.isConnected():
             ib.disconnect()
-            print("Disconnected from IB\n")
+            if msg:
+                print("Disconnected from IB\n")
 
 
-
-def get_financials(account: str = "") -> dict:
+def get_financials(account: str = "", msg: bool=False) -> dict:
     """
     Get account financial values for the specified account or all consolidated accounts.
     
@@ -194,10 +194,11 @@ def get_financials(account: str = "") -> dict:
     finally:
         if ib and ib.isConnected():
             ib.disconnect()
-            print("Disconnected from IB\n")
+            if msg:
+                print("Disconnected from IB\n")
 
 
-def get_open_orders(account_no: str, is_active: bool = False) -> pd.DataFrame:
+def get_open_orders(account_no: str, is_active: bool = False, msg: bool=False) -> pd.DataFrame:
     """
     Get open orders for the specified account.
     
@@ -268,7 +269,8 @@ def get_open_orders(account_no: str, is_active: bool = False) -> pd.DataFrame:
     finally:
         if ib and ib.isConnected():
             ib.disconnect()
-            print("Disconnected from IB\n")
+            if msg:
+                print("Disconnected from IB\n")
 
 #%%
 # Functions to classify portfolios, open orders and update unds
@@ -635,7 +637,7 @@ def update_unds_status(df_unds:pd.DataFrame,
 
     return df_unds
 
-def classifed_results(account_no: str, max_days: int = 1) -> dict:
+def classifed_results(account_no: str, max_days: int = 1, msg: bool = False) -> dict:
 
     """
     Retrieve and process portfolio data, financials, and orders for specified account.
@@ -652,32 +654,34 @@ def classifed_results(account_no: str, max_days: int = 1) -> dict:
     
     # Check if data needs refresh and load chains and underlying data
     chain_path = ROOT / 'data' / 'df_chains.pkl'
-    df_chains_check = get_pickle(chain_path)
-    if do_i_refresh(my_path=chain_path, max_days=1) \
+    df_chains_check = get_pickle(chain_path, print_msg=msg)
+    if do_i_refresh(my_path=chain_path, max_days=max_days) \
         or df_chains_check is None or (isinstance(df_chains_check, pd.DataFrame) and df_chains_check.empty):
         result['df_chains'], result['df_unds'] = chains_n_unds()
     else:
-        result['df_chains'] = get_pickle(path=root_path / 'data' / 'df_chains.pkl')
-        result['df_unds'] = get_pickle(path=root_path / 'data' / 'df_unds.pkl')
+        result['df_chains'] = get_pickle(path=root_path / 'data' / 'df_chains.pkl', print_msg=msg)
+        result['df_unds'] = get_pickle(path=root_path / 'data' / 'df_unds.pkl', print_msg=msg)
 
     # Get portfolio and open orders
-    print(f"\nGet portfolio for account: {account_no}\n")
+    print(f"\nGetting portfolio for account: {account_no}\n")
     
     result['df_pf'] = get_ib_portfolio(account=account_no)
     result['df_pf'] = classify_pf(result['df_pf'])
-    
-    print(f"{len(result['df_pf'][result['df_pf'].secType == 'STK'])} stocks and "
-          f"{len(result['df_pf'][result['df_pf'].secType == 'OPT'])} options in df_pf:\n")
-    print(f"{result['df_pf'].drop('contract',axis=1).to_string()}\n")
 
     result['df_openords'] = get_open_orders(account_no=account_no, is_active=True)
     result['df_openords'] = classify_open_orders(result['df_openords'], result['df_pf'])
 
-    print(f'\n{len(result['df_openords'])} df_openords:\n')
-    print(f"{result['df_openords'].drop(columns=['contract', 'order']).to_string()}\n")
 
     result['df_unds'] = update_unds_status(result['df_unds'], result['df_pf'], result['df_openords'])
-    print(f"\n{len(result['df_unds'])} df_unds:\n {result['df_unds'].head().to_string()}")
+
+    if msg:
+        print(f"{len(result['df_pf'][result['df_pf'].secType == 'STK'])} stocks and "
+            f"{len(result['df_pf'][result['df_pf'].secType == 'OPT'])} options in df_pf:\n")
+        print(f'\n{len(result['df_openords'])} df_openords:\n')
+        
+        print(f"{result['df_pf'].drop('contract',axis=1).to_string()}\n")
+        print(f"{result['df_openords'].drop(columns=['contract', 'order']).to_string()}\n")
+        print(f"\n{len(result['df_unds'])} df_unds:\n {result['df_unds'].head().to_string()}")
 
     return result
 

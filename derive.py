@@ -467,9 +467,9 @@ df_reap = df_pf[df_pf.symbol.isin(df_sowed.symbol)
 df_reap = df_reap[df_reap.expiry.apply(get_dte) > MINREAPDTE].reset_index(drop=True)
 
 df_reap = df_reap.merge(
-    df_unds[["symbol", "iv"]], on="symbol", how="left"
+    df_unds[["symbol", "iv", "price"]], on="symbol", how="left"
 )
-df_reap.rename(columns={"iv": "vy"}, inplace=True)
+df_reap.rename(columns={"iv": "vy", "price": "undPrice"}, inplace=True)
 
 if not df_reap.empty:
     print(f"Processing {len(df_reap)} unreaped positions...")
@@ -482,23 +482,8 @@ if not df_reap.empty:
     if valid_contracts:
         print("Calculating reap option prices...")
         reap_prices = {}
-        for _, row in tqdm(
-            df_reap.iterrows(), total=len(df_reap), desc="Calc reap prices"
-        ):
-            if row["contract"] and row["vy"] and row["undPrice"]:
-                try:
-                    result = ib.calculateOptionPrice(
-                        row["contract"], row["vy"], row["undPrice"]
-                    )
-                    reap_prices[row["contract"].conId] = result
-                except Exception:
-                    continue
-
-        df_reap['optPrice'] = (
-            df_reap["contract"]
-            .apply(lambda c: reap_prices.get(c.conId, None))
-            .apply(lambda x: x.optPrice if x else np.nan)
-        )
+        df_reap_prices = get_volatilities_snapshot(valid_contracts, market='SNP')
+        df_reap['optPrice'] = df_reap.merge(df_reap_prices, on="symbol")["price"]
 
         df_reap["xPrice"] = df_reap["optPrice"].apply(
             lambda x: get_prec(max(0.01, x), 0.01) if pd.notna(x) else 0.01
@@ -743,29 +728,6 @@ else:
     mask = df_protect['iv'].notna()
     df_protect.loc[mask, 'vy'] = df_protect.loc[mask, 'iv']
 
-    # # Calculate theoretical option prices with a fresh connection
-    # print("Calculating theoretical option prices...")
-    # protect_prices = {}
-    # with get_ib_connection("SNP") as ib:
-        
-    #     for _, row in tqdm(
-    #         df_protect.iterrows(), total=len(df_protect), desc="Calc prices"
-    #     ):
-    #         if row["contract"] and row["vy"] and row["undPrice"]:
-    #             try:
-    #                 result = ib.calculateOptionPrice(
-    #                     row["contract"], row["vy"], row["undPrice"]
-    #                 )
-    #                 protect_prices[row["contract"].conId] = result
-    #             except Exception:
-    #                 continue
-
-    #     df_protect["optPrice"] = (
-    #         df_protect["contract"]
-    #         .apply(lambda c: protect_prices.get(c.conId, None))
-    #         .apply(lambda x: x.optPrice if x else np.nan)
-    #     )
-
     df_protect["xPrice"] = df_protect["price"].apply(
         lambda x: get_prec(max(0.01, x), 0.01) if pd.notna(x) else 0.01
     )
@@ -875,8 +837,10 @@ if not p.empty:
         df_iv_purl = get_volatilities_snapshot(df_purl["contract"].tolist(), market="SNP")
 
         if not df_iv_purl.empty:
-            purls = df_iv_purl.merge(df_unds[['symbol', 'price']], on='symbol')
-            purls.rename(columns={'price': 'undPrice'}, inplace=True)
+            df_up = df_unds.assign(undPrice=lambda x: x.price)
+            
+            purls = df_iv_purl.merge(df_up[['symbol', 'undPrice']], on='symbol')
+            purls = purls.merge(df_u[['conId', 'secType', 'right', 'strike', 'expiry']], on='conId')
             purls = purls.merge(df_rol[['symbol', 'odiff']], on='symbol')
             purls = purls.merge(df_rol[['symbol', 'ostrike']], on='symbol')
             purls = purls.merge(df_rol[['symbol', 'odte']], on='symbol')
