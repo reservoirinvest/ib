@@ -872,8 +872,8 @@ if not p.empty:
 
             rollover_cost = (purls1.price - purls1.cost + purls1['strike'] - purls1['ostrike']) * purls1.qty * 100
             print(f"\nThe rollover cost of {purls1.symbol.unique().shape[0]} symbols for {purls1.expiry.apply(get_dte).max():.0f} days would be ${rollover_cost.sum():,.0f}.\n")
-
-            purls_path = ROOT / 'data' / 'protect_rolls.pkl'
+            purls1 = purls1[rol_cols].sort_values('rollcost', ascending=False)
+            purls_path = ROOT / 'data' / 'df_prot_rolls.pkl'
             pickle_me(purls1[rol_cols], purls_path)
         else:
             print("No option price data available for protecting put rolls")

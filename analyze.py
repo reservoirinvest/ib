@@ -36,7 +36,7 @@ unds_path = ROOT / "data" / "df_unds.pkl"
 protect_path = ROOT / "data" / "df_protect.pkl"
 reap_path = ROOT / "data" / "df_reap.pkl"
 chains_path = ROOT / "data" / "df_chains.pkl"
-purls_path = ROOT / "data" / "protect_rolls.pkl"
+purls_path = ROOT / "data" / "df_prot_rolls.pkl"
 
 # Load pickled dataframes, handle None gracefully
 df_cov = get_pickle(cov_path, print_msg=False) 
@@ -187,6 +187,12 @@ df_assign = df[(df.state == 'sowed') & (
     ((df.right == 'C') & (df.undPrice > df.strike)) |
     ((df.right == 'P') & (df.strike > df.undPrice))
 )].reset_index(drop=True)
+
+# Covers about to get blown
+df_cov_blow = df[(df.state == 'covering') & (df.source == 'pf') & (
+    ((df.right == 'C') & (df.strike < df.undPrice)) |
+    ((df.right == 'P') & (df.strike > df.undPrice))
+)]
 
 # Cover blown: STK or short OPT in covering symbols
 cols = ['symbol', 'secType', 'position', 'right', 'dte', 'strike', 'undPrice', 'avgCost', 'mktVal', 'unPnL']
