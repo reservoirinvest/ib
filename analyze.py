@@ -117,6 +117,10 @@ df = (pd.concat([df, df_unds.assign(source='und')], ignore_index=True)
 und_price_dict = df_unds.set_index('symbol')['price'].to_dict() if not df_unds.empty else {}
 df['undPrice'] = df['symbol'].map(und_price_dict)
 
+# Sum unPnL for underlyings
+sum_by_symbol = df.groupby('symbol')['unPnL'].transform('sum')
+df.loc[df['source'] == 'und', 'unPnL'] = sum_by_symbol
+
 # Fill mktVal for open orders from portfolio mean (if available)
 df.loc[df.source == 'oo', 'mktVal'] = df.groupby('symbol')['mktVal'].transform('mean')
 
@@ -187,6 +191,8 @@ df_assign = df[(df.state == 'sowed') & (
     ((df.right == 'C') & (df.undPrice > df.strike)) |
     ((df.right == 'P') & (df.strike > df.undPrice))
 )].reset_index(drop=True)
+
+df_assign.sort_values('unPnL', ascending=True, inplace=True)
 
 # Covers about to get blown
 df_cov_blow = df[(df.state == 'covering') & (df.source == 'pf') & (

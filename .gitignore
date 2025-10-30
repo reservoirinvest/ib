@@ -25,7 +25,7 @@ ipython_config.py
 # Others
 z*/
 **/z*.*
-**/traded*.*
+data/traded_*.*
 log/*.*
 .ruff*
 .python*
