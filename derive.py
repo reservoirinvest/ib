@@ -8,7 +8,6 @@ import pandas as pd
 from ib_async import Option, util
 from loguru import logger
 from tqdm import tqdm
-
 from build import (
     ROOT,
     atm_margin,
@@ -21,6 +20,7 @@ from build import (
     pickle_me,
     qualify_me,
 )
+
 from classify import classifed_results, clean_ib_util_df, get_financials, get_open_orders, classify_open_orders
 
 # Start timing the script execution
@@ -29,17 +29,17 @@ start_time = time.time()
 def filter_closest_dates(chains, protect_dte, num_dates=2):
     """
     Filter rows from chains DataFrame to get the closest dates to protect_dte for each symbol.
-    
+
     Args:
         chains (pd.DataFrame): DataFrame containing 'symbol' and 'dte' columns
         protect_dte (datetime): The target date to find closest dates to
         num_dates (int): Number of closest dates to return per symbol (default: 2)
-        
+
     Returns:
         pd.DataFrame: Filtered DataFrame containing only the rows with the closest dates for each symbol
     """
     result = []
-    
+
     for symbol, group in chains.groupby('symbol'):
         group = group.copy()
         group['date_diff'] = (group['dte'] - protect_dte).abs()
@@ -47,42 +47,42 @@ def filter_closest_dates(chains, protect_dte, num_dates=2):
         closest_dates = unique_dates.nsmallest(num_dates, 'date_diff')['dte']
         filtered_group = group[group['dte'].isin(closest_dates)].drop(columns=['date_diff'])
         result.append(filtered_group)
-    
+
     return pd.concat(result, ignore_index=True) if result else pd.DataFrame()
 
 def filter_closest_strikes(chains, n=-2):
     """
     Filter rows to get the closest strikes to undPrice for each symbol and expiry.
-    
+
     Args:
         chains (pd.DataFrame): DataFrame containing 'symbol', 'dte', 'strike', 'undPrice' columns
-        n (int): Number of strikes to return. 
+        n (int): Number of strikes to return.
                  If positive (calls for shorts): returns n closest strikes >= undPrice, sorted by strike ascending
                  If negative (puts for longs): returns |n| closest strikes <= undPrice, sorted by strike descending
-                 
+
     Returns:
         pd.DataFrame: Filtered DataFrame with closest strikes
     """
     if n == 0:
         return pd.DataFrame()
-        
+
     result = []
     abs_n = abs(n)
-    
+
     for (symbol, expiry), group in chains.groupby(['symbol', 'dte']):
         group = group.copy()
         filtered = group.copy()
-        
+
         if n > 0:
             filtered = group[group['strike'] >= group['undPrice']]
             filtered = filtered.sort_values('strike', ascending=True)
         else:
             filtered = group[group['strike'] <= group['undPrice']]
             filtered = filtered.sort_values('strike', ascending=False)
-        
+
         if not filtered.empty:
             result.append(filtered.head(abs_n))
-    
+
     return pd.concat(result, ignore_index=True) if result else pd.DataFrame()
 
 #%% CONFIG AND SETUP
@@ -104,6 +104,7 @@ VIRGIN_DTE = config.get("VIRGIN_DTE")
 MAX_FILE_AGE = config.get("MAX_FILE_AGE")
 VIRGIN_QTY_MULT = config.get("VIRGIN_QTY_MULT")
 COVXPMULT = config.get("COVXPMULT")
+COV_STD_MULT = config.get('COV_STD_MULT')
 MINNAKEDOPTPRICE = config.get("MINNAKEDOPTPRICE")
 NAKEDXPMULT = config.get("NAKEDXPMULT")
 REAPRATIO = config.get("REAPRATIO")
@@ -114,15 +115,16 @@ VIRGIN_PUT_STD_MULT = config.get("VIRGIN_PUT_STD_MULT")
 
 print("\n\nMAX_FILE_AGE:", MAX_FILE_AGE)
 print("\nCOVER_ME:", COVER_ME)
+print("COV_STD_MULT:", COV_STD_MULT)
 print("COVXPMULT:", COVXPMULT)
 print("COVER_MIN_DTE:", COVER_MIN_DTE)
 
 print("\nSOW_NAKEDS:", SOW_NAKEDS)
-print("VIRGIN_DTE:", VIRGIN_DTE)
-print("VIRGIN_QTY_MULT:", VIRGIN_QTY_MULT)
 print("VIRGIN_CALL_STD_MULT:", VIRGIN_CALL_STD_MULT)
 print("VIRGIN_PUT_STD_MULT:", VIRGIN_PUT_STD_MULT)
 print("NAKEDXPMULT:", NAKEDXPMULT)
+print("VIRGIN_DTE:", VIRGIN_DTE)
+print("VIRGIN_QTY_MULT:", VIRGIN_QTY_MULT)
 print("MINNAKEDOPTPRICE:", MINNAKEDOPTPRICE)
 
 print("\nREAP_ME:", REAP_ME)
@@ -178,7 +180,7 @@ if not uncov_long.empty:
     df_cc.rename(columns={"price": "undPrice", "iv": "vy"}, inplace=True)
 
     df_cc["sdev"] = df_cc.undPrice * df_cc.vy * (df_cc.dte / 365) ** 0.5
-    
+
     vol_based_price = df_cc.undPrice + config.get("COVER_STD_MULT") * df_cc.sdev
     df_cc["covPrice"] = np.maximum(df_cc.avgCost, vol_based_price)
 
@@ -207,7 +209,7 @@ if not uncov_long.empty:
 
     if valid_contracts:
         df_cc1 = clean_ib_util_df(valid_contracts)
-    
+
         df_ccf = df_cc1.loc[df_cc1.groupby("symbol")["strike"].idxmin()]
 
         df_ccf = df_ccf.reset_index(drop=True)
@@ -218,7 +220,7 @@ if not uncov_long.empty:
         df_ccf.rename(columns={"price": "undPrice", "iv": "vy"}, inplace=True)
 
         df_ccf = df_ccf.merge(
-            df_pf[df_pf.state.isin(["uncovered", "exposed"]) & (df_pf.secType == "STK")][["symbol", "position", "avgCost"]], 
+            df_pf[df_pf.state.isin(["uncovered", "exposed"]) & (df_pf.secType == "STK")][["symbol", "position", "avgCost"]],
             on="symbol", how="left"
         )
 
@@ -239,6 +241,7 @@ if not uncov_long.empty:
             print("No option price data available for covered calls")
     else:
         print("No valid contracts after qualification")
+        df_ccf = pd.DataFrame()
 else:
     df_ccf = pd.DataFrame()
     print("No long uncovered/exposed positions")
@@ -261,7 +264,7 @@ if not uncov_short.empty:
     df_cp.rename(columns={"price": "undPrice", "iv": "vy"}, inplace=True)
 
     df_cp["sdev"] = df_cp.undPrice * df_cp.vy * (df_cp.dte / 365) ** 0.5
-    
+
     vol_based_price = df_cp.undPrice - config.get("COVER_STD_MULT") * df_cp.sdev
     df_cp["covPrice"] = np.minimum(df_cp.avgCost, vol_based_price)
 
@@ -301,7 +304,7 @@ if not uncov_short.empty:
         df_cpf.rename(columns={"price": "undPrice", "iv": "vy"}, inplace=True)
 
         df_cpf = df_cpf.merge(
-            df_pf[df_pf.state.isin(["uncovered", "exposed"]) & (df_pf.secType == "STK")][["symbol", "position", "avgCost"]], 
+            df_pf[df_pf.state.isin(["uncovered", "exposed"]) & (df_pf.secType == "STK")][["symbol", "position", "avgCost"]],
             on="symbol", how="left"
         )
 
@@ -320,10 +323,12 @@ if not uncov_short.empty:
             )
         else:
             print("No option price data available for covered puts")
+
     else:
         print("No valid contracts after qualification")
+        df_cpf = pd.DataFrame()
 else:
-    df_cpf = pd.DataFrame()
+
     print("No short uncovered/exposed positions")
 
 df_cov = pd.concat([df_ccf, df_cpf], ignore_index=True)
@@ -373,7 +378,7 @@ df_virg = chains.loc[
     .apply(lambda x: x.sub(VIRGIN_DTE).abs().idxmin())
 ]
 
-df_virg = df_virg.merge(df_unds[["symbol", "price", "iv"]], 
+df_virg = df_virg.merge(df_unds[["symbol", "price", "iv"]],
             on="symbol", how="left")
 df_virg.rename(columns={"price": "undPrice", "iv": "vy"}, inplace=True)
 
@@ -461,7 +466,7 @@ print("\n=== MAKE REAPS ===")
 
 df_sowed = df_unds[df_unds.state == "unreaped"].reset_index(drop=True)
 
-df_reap = df_pf[df_pf.symbol.isin(df_sowed.symbol) 
+df_reap = df_pf[df_pf.symbol.isin(df_sowed.symbol)
             & (df_pf.secType == "OPT")].reset_index(drop=True)
 
 df_reap = df_reap[df_reap.expiry.apply(get_dte) > MINREAPDTE].reset_index(drop=True)
@@ -838,7 +843,7 @@ if not p.empty:
 
         if not df_iv_purl.empty:
             df_up = df_unds.assign(undPrice=lambda x: x.price)
-            
+
             purls = df_iv_purl.merge(df_up[['symbol', 'undPrice']], on='symbol')
             purls = purls.merge(df_u[['conId', 'secType', 'right', 'strike', 'expiry']], on='conId')
             purls = purls.merge(df_rol[['symbol', 'odiff']], on='symbol')

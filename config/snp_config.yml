@@ -17,15 +17,15 @@ COVER_ME: True
 COVER_MIN_DTE: 4
 
 COVER_STD_MULT: 0.5
-COVXPMULT: 2.5 # multiple for cover expected price
+COVXPMULT: 3.2 # multiple for cover expected price
 
 SOW_NAKEDS: True
 VIRGIN_DTE: 7 # minimum days to expiration for nakeds
 
-VIRGIN_PUT_STD_MULT: 1.25
+VIRGIN_PUT_STD_MULT: 1.5
 VIRGIN_CALL_STD_MULT: 3
-NAKEDXPMULT: 2.85  # multiple for naked expected price
-MINNAKEDOPTPRICE: 2 # To ensure we get at least this many $/share from naked puts
+NAKEDXPMULT: 3  # multiple for naked expected price
+MINNAKEDOPTPRICE: 2.5 # To ensure we get at least this many $/share from naked puts
 
 VIRGIN_QTY_MULT: 0.08 # 8% of NLV divided by margin = qty of virgins
 

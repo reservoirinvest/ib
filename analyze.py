@@ -1,9 +1,10 @@
 # %%
 # IMPORTS AND CONFIGS
 
+import os
+
 import numpy as np
 import pandas as pd
-import os
 
 from build import (
     ROOT,
@@ -14,10 +15,10 @@ from build import (
     load_config,
 )
 from classify import (
+    classifed_results,
     classify_open_orders,
     get_financials,
     get_open_orders,
-    classifed_results,
 )
 
 # Load config
@@ -37,13 +38,15 @@ protect_path = ROOT / "data" / "df_protect.pkl"
 reap_path = ROOT / "data" / "df_reap.pkl"
 chains_path = ROOT / "data" / "df_chains.pkl"
 purls_path = ROOT / "data" / "df_prot_rolls.pkl"
+deorph_path = ROOT / "data" / "df_deorph.pkl"
 
 # Load pickled dataframes, handle None gracefully
-df_cov = get_pickle(cov_path, print_msg=False) 
-df_nkd = get_pickle(nkd_path, print_msg=False) 
-df_protect = get_pickle(protect_path, print_msg=False) 
-df_reap = get_pickle(reap_path, print_msg=False) 
-df_rolls = get_pickle(purls_path, print_msg=False) 
+df_cov = get_pickle(cov_path, print_msg=False)
+df_nkd = get_pickle(nkd_path, print_msg=False)
+df_protect = get_pickle(protect_path, print_msg=False)
+df_reap = get_pickle(reap_path, print_msg=False)
+df_rolls = get_pickle(purls_path, print_msg=False)
+df_deorph = get_pickle(deorph_path, print_msg=False)
 
 # %%
 ACCOUNT = 'US_ACCOUNT'
@@ -133,7 +136,7 @@ df.loc[(df.source == 'pf') & (df.secType == 'STK'), 'qty'] = df['position'] / 10
 df.loc[(df.source == 'pf') & (df.secType == 'OPT'), 'qty'] = df['position']
 
 cols = [
-    'source', 'symbol', 'conId', 'secType', 'position', 'state', 'undPrice', 'strike', 
+    'source', 'symbol', 'conId', 'secType', 'position', 'state', 'undPrice', 'strike',
     'avgCost', 'mktVal', 'right', 'expiry', 'dte', 'qty', 'lmtPrice', 'action', 'unPnL'
 ]
 df = df[cols]
@@ -203,7 +206,7 @@ df_cov_blow = df[(df.state == 'covering') & (df.source == 'pf') & (
 # Cover blown: STK or short OPT in covering symbols
 cols = ['symbol', 'secType', 'position', 'right', 'dte', 'strike', 'undPrice', 'avgCost', 'mktVal', 'unPnL']
 cover_condition = (
-    (df.source == 'pf') & 
+    (df.source == 'pf') &
     (df.symbol.isin(df_assign[df_assign.state == 'covering'].symbol)) &
     ((df.secType == 'STK') | ((df.secType == 'OPT') & (df.position < 0)))
 )

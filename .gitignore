@@ -9,6 +9,7 @@ wheels/
 # Environments
 .env
 .venv
+.zed
 env/
 venv/
 ENV/
@@ -25,9 +26,7 @@ ipython_config.py
 # Others
 z*/
 **/z*.*
-data/traded_*.*
+data/t*.*
 log/*.*
 .ruff*
 .python*
-
-
