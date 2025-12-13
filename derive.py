@@ -328,7 +328,7 @@ if not uncov_short.empty:
         print("No valid contracts after qualification")
         df_cpf = pd.DataFrame()
 else:
-
+    df_cpf = pd.DataFrame()
     print("No short uncovered/exposed positions")
 
 df_cov = pd.concat([df_ccf, df_cpf], ignore_index=True)

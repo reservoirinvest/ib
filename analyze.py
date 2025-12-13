@@ -366,3 +366,16 @@ if not chains.empty and not df_unds.empty:
     print("In chains from unds:", missing_in_chains)
     print("In chains from pf:", missing_in_chains_from_pf)
 # %%
+# OVERALL P&L CHECK
+df_pnl = (
+    df_pf.groupby('symbol', as_index=False)['unPnL']
+         .sum()
+         .rename(columns={'unPnL': 'symbolPnL'})
+         .sort_values('symbolPnL', ascending=True)
+         .reset_index(drop=True)
+)
+
+print('\nOVERALL PnL CHECK')
+print('===================')
+print(df_pnl.to_string(index=False))
+# %%
