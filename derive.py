@@ -7,7 +7,6 @@ import numpy as np
 import pandas as pd
 from ib_async import Option, util
 from loguru import logger
-from tqdm import tqdm
 from build import (
     ROOT,
     atm_margin,

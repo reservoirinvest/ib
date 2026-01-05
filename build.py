@@ -514,6 +514,9 @@ def get_qualified_symbols(weeklies: bool = True, market: str = "SNP", save: bool
     print(f"Retrieved {len(symbols)} symbols (weeklies={weeklies})")
 
     contracts = qualify_stock_contracts(symbols, market=market)
+
+    # Normalize tradingClass for contracts with 'NMS'
+    contracts = normalize_trading_class(contracts)
     
     if save:
         pickle_me(contracts, file_path=ROOT/'data'/'symbols.pkl')
@@ -995,6 +998,15 @@ def get_option_chains(
             ib.disconnect()
             print("Disconnected from IB\n")
 
+# Change tradingClass for contracts that have 'NMS' in them.
+# This is due to some error in NYSE that puts tradingClass as 'NMS'.
+
+def normalize_trading_class(contracts: list) -> list:
+    for contract in contracts:
+        if getattr(contract, "tradingClass", None) == "NMS" and contract.symbol != "NMS":
+            contract.tradingClass = None
+    return contracts
+
 # Function to calculate ATM margin for each row
 def calculate_atm_margin(row, chains_df, target_dte):
     symbol = row['symbol']
@@ -1084,6 +1096,7 @@ if __name__ == "__main__":
     # Get qualified contracts
     if do_i_refresh(my_path=sym_path, max_days=1):
         qualified_contracts = get_qualified_symbols(weeklies=True, market="SNP", save=True)
+        # qualified_contracts = normalize_trading_class(qualified_contracts)
         pickle_me(qualified_contracts, file_path=sym_path)
     else:
         qualified_contracts = get_pickle(path=sym_path)

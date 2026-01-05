@@ -1,3 +1,4 @@
+#%%
 from __future__ import annotations
 
 from pathlib import Path
@@ -49,7 +50,7 @@ def delete_files(recursive: bool = True, dry_run: bool = False) -> dict[Path, li
         report[directory] = clear_directory(directory, recursive=recursive, dry_run=dry_run)
     return report
 
-
+#%%
 if __name__ == "__main__":
     deleted = delete_files()
     for directory, files in deleted.items():
