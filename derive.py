@@ -178,10 +178,20 @@ if not uncov_long.empty:
     df_cc = df_cc.merge(df_unds[["symbol", "price", "iv", "avgCost"]], on="symbol", how="left")
     df_cc.rename(columns={"price": "undPrice", "iv": "vy"}, inplace=True)
 
+    long_put_cost = (
+        df_pf[(df_pf.right == "P") & (df_pf.position > 0)]
+        .assign(avgCostPerShare=lambda x: x.avgCost / 100)
+        .groupby("symbol", as_index=False)["avgCostPerShare"].sum()
+        .rename(columns={"avgCostPerShare": "longPutCost"})
+    )
+
+    df_cc = df_cc.merge(long_put_cost, on="symbol", how="left")
+    df_cc["longPutCost"] = df_cc["longPutCost"].fillna(0)
+
     df_cc["sdev"] = df_cc.undPrice * df_cc.vy * (df_cc.dte / 365) ** 0.5
 
     vol_based_price = df_cc.undPrice + config.get("COVER_STD_MULT") * df_cc.sdev
-    df_cc["covPrice"] = np.maximum(df_cc.avgCost, vol_based_price)
+    df_cc["covPrice"] = np.maximum(df_cc.avgCost + df_cc.longPutCost, vol_based_price)
 
     no_of_options = 3
 
