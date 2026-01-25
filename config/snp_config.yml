@@ -15,7 +15,6 @@ MINCUSHION: 0.3 # 30% minimum cushion for responsible marging trading. Higher th
 
 COVER_ME: True
 COVER_MIN_DTE: 4
-
 COVER_STD_MULT: 0.5
 COVXPMULT: 1.25 # multiple for cover expected price
 

@@ -103,7 +103,7 @@ VIRGIN_DTE = config.get("VIRGIN_DTE")
 MAX_FILE_AGE = config.get("MAX_FILE_AGE")
 VIRGIN_QTY_MULT = config.get("VIRGIN_QTY_MULT")
 COVXPMULT = config.get("COVXPMULT")
-COV_STD_MULT = config.get('COV_STD_MULT')
+COV_STD_MULT = config.get('COVER_STD_MULT')
 MINNAKEDOPTPRICE = config.get("MINNAKEDOPTPRICE")
 NAKEDXPMULT = config.get("NAKEDXPMULT")
 REAPRATIO = config.get("REAPRATIO")
@@ -804,7 +804,7 @@ delete_pkl_files(['protect_rolls.pkl'])
 df_pfu = df_pf.merge(df_unds[['symbol', 'price']], on='symbol', how='left')
 df_pfu.rename(columns={'price': 'undPrice'}, inplace=True)
 
-df_rol = (
+df_rolls = (
     df_pfu[(df_pfu['state'] == 'protecting') & (df_pfu.right == 'P')]
     .assign(
         odiff=lambda x: (x['undPrice'] - x['strike']),
@@ -816,9 +816,27 @@ df_rol = (
     .reset_index(drop=True)
 )
 
-if not df_rol.symbol.isnull().all().all():
+short_itm_calls = (
+    df_pfu[
+        (df_pfu.secType == 'OPT')
+        & (df_pfu.right == 'C')
+        & (df_pfu.position < 0)
+        & df_pfu['undPrice'].notna()
+    ]
+    .loc[lambda x: x['strike'] < x['undPrice'], 'symbol']
+    .unique()
+)
 
-    rol_chains = chains[chains.symbol.isin(set(df_rol.symbol))]
+if short_itm_calls.size:
+    df_rolls = df_rolls[~df_rolls.symbol.isin(short_itm_calls)].reset_index(drop=True)
+    print(
+        "Skipping protecting-put rolls for symbols with ITM short calls: "
+        + ", ".join(sorted(short_itm_calls))
+    )
+
+if not df_rolls.symbol.isnull().all().all():
+
+    rol_chains = chains[chains.symbol.isin(set(df_rolls.symbol))]
 
     rol_chains = rol_chains.set_index('symbol').join(df_unds.set_index('symbol')[['price']]).reset_index()
     rol_chains.rename(columns={'price': 'undPrice'}, inplace=True)
@@ -855,9 +873,9 @@ if not p.empty:
 
             purls = df_iv_purl.merge(df_up[['symbol', 'undPrice']], on='symbol')
             purls = purls.merge(df_u[['conId', 'secType', 'right', 'strike', 'expiry']], on='conId')
-            purls = purls.merge(df_rol[['symbol', 'odiff']], on='symbol')
-            purls = purls.merge(df_rol[['symbol', 'ostrike']], on='symbol')
-            purls = purls.merge(df_rol[['symbol', 'odte']], on='symbol')
+            purls = purls.merge(df_rolls[['symbol', 'odiff']], on='symbol')
+            purls = purls.merge(df_rolls[['symbol', 'ostrike']], on='symbol')
+            purls = purls.merge(df_rolls[['symbol', 'odte']], on='symbol')
 
             purls['diff'] = purls['strike'] / purls['undPrice'] - 1
             purls = purls.sort_values('diff', key=lambda x: x - purls['odiff'])
@@ -871,6 +889,7 @@ if not p.empty:
                 print(purls[purls['diff'] < -0.05][cols])
 
             purls1 = purls[purls['diff'] >= -0.05]
+            purls1 = purls1[purls1['strike'] != purls1['ostrike']]
 
             purls1 = purls1.copy()
             purls1['qty'] = purls1['symbol'].map(df_unds.set_index('symbol')['position'] / 100)

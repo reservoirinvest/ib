@@ -42,6 +42,7 @@ def make_ib_orders(df: pd.DataFrame, action: str, account_no: str) -> tuple:
             action=action,
             totalQuantity=abs(int(q)),
             lmtPrice=get_prec(p, 0.01),
+            tif='DAY',
             account=account_no  # Set the account number for the order
         )
         for q, p in zip(df.qty, df.xPrice)
