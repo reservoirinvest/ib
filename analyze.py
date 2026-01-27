@@ -329,13 +329,38 @@ print('=======================')
 df_counts = {
     k: len(v) if isinstance(v, pd.DataFrame) else 0
     for k, v in {
+        'df_deorph': df_deorph,
         'df_cov': df_cov,
         'df_protect': df_protect,
         'df_reap': df_reap,
         'df_nkd': df_nkd,
+        'df_rolls': df_rolls,
     }.items()
 }
 print(', '.join(f"{k}: {v}" for k, v in df_counts.items()))
+
+if df_unds is not None and not df_unds.empty:
+    orphaned_symbols = set(df_unds[df_unds.state == 'orphaned'].symbol)
+    de_orphed_symbols = set(df_deorph['symbol']) if df_deorph is not None and not df_deorph.empty else set()
+    if len(orphaned_symbols - de_orphed_symbols) > 0:
+        print(f"\nOrphaned symbols left out: {', '.join(orphaned_symbols - de_orphed_symbols)}")
+
+    uncovered_symbols = set(df_unds[df_unds.state == 'uncovered'].symbol)
+    covered_symbols = set(df_cov['symbol']) if df_cov is not None and not df_cov.empty else set()
+    if len(uncovered_symbols - covered_symbols) > 0:
+        print(f"\nUncovered symbols left out: {', '.join(uncovered_symbols - covered_symbols)}")
+
+    unreaped_symbols = set(df_unds[df_unds.state == 'unreaped'].symbol)
+    reaped_symbols = set(df_reap['symbol']) if df_reap is not None and not df_reap.empty else set()
+    if len(unreaped_symbols - reaped_symbols) > 0:
+        print(f"\nUnreaped symbols left out: {', '.join(unreaped_symbols - reaped_symbols)}")
+
+    unprotected_symbols = set(df_unds[df_unds.state.isin(['exposed', 'unprotected'])].symbol)
+    protected_symbols = set(df_unds[df_unds.state.isin(['zen', 'uncovered'])].symbol)
+    if len(unprotected_symbols - protected_symbols) > 0:
+        print(f"\nUnprotected symbols left out: {', '.join(unprotected_symbols - protected_symbols)}")
+
+
 
 # %%
 # ANALYZES THE BASE DATA QUALITY

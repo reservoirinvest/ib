@@ -20,8 +20,8 @@ COVXPMULT: 1.25 # multiple for cover expected price
 
 SOW_NAKEDS: True
 VIRGIN_DTE: 8 # minimum days to expiration for nakeds
-VIRGIN_PUT_STD_MULT: 1.8
-VIRGIN_CALL_STD_MULT: 3
+VIRGIN_PUT_STD_MULT: 1.65
+VIRGIN_CALL_STD_MULT: 3.5
 NAKEDXPMULT: 3.5  # multiple for naked expected price
 MINNAKEDOPTPRICE: 2.2 # To ensure we get at least this many $/share from naked puts
 
