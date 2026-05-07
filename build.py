@@ -517,6 +517,7 @@ def get_qualified_symbols(weeklies: bool = True, market: str = "SNP", save: bool
 
     # Normalize tradingClass for contracts with 'NMS'
     contracts = normalize_trading_class(contracts)
+    contracts = [c for c in contracts if c != None]
     
     if save:
         pickle_me(contracts, file_path=ROOT/'data'/'symbols.pkl')

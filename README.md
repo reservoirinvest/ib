@@ -57,7 +57,7 @@ Portfolio states are derived from dataframe 'pf'
 
 ### Order state
 
-Order states are derifed from df_openords
+Order states are derived from df_openords
 
     - 'covering' - an option order symbol with action: SELL, having an underlying stock position derived from pf dataframe
     - 'protecting' - an option order symbol with action: BUY, having an underlying stock position derived from pf dataframe

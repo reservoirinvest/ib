@@ -3,7 +3,7 @@ MARKET: SNP
 LOGLEVEL: ERROR
 
 MAX_FILE_AGE: 1
-MAX_DTE: 60
+MAX_DTE: 50
 
 # SNP ports and client IDs
 PORT: 1300
@@ -11,26 +11,26 @@ PAPER: 1301
 
 CID: 10
 
-MINCUSHION: 0.3 # 30% minimum cushion for responsible marging trading. Higher the better.
+MINCUSHION: 0.2 # 20% minimum cushion for responsible marging trading. Higher the better.
 
 COVER_ME: True
 COVER_MIN_DTE: 4
-COVER_STD_MULT: 0.5
-COVXPMULT: 1.25 # multiple for cover expected price
+COVER_STD_MULT: 0.65
+COVXPMULT: 1.2 # multiple for cover expected price
 
 SOW_NAKEDS: True
-VIRGIN_DTE: 8 # minimum days to expiration for nakeds
-VIRGIN_PUT_STD_MULT: 1.65
-VIRGIN_CALL_STD_MULT: 3.5
-NAKEDXPMULT: 3.5  # multiple for naked expected price
-MINNAKEDOPTPRICE: 2.2 # To ensure we get at least this many $/share from naked puts
+VIRGIN_DTE: 5 # minimum days to expiration for nakeds
+VIRGIN_CALL_STD_MULT: 3.8
+VIRGIN_PUT_STD_MULT: 1.2
+NAKEDXPMULT: 4.95 # multiple for naked expected price
+MINNAKEDOPTPRICE: 2.5 # To ensure we get at least this many $/share from naked puts
 
-VIRGIN_QTY_MULT: 0.08 # 8% of NLV divided by margin = qty of virgins
+VIRGIN_QTY_MULT: 0.055 # 5.5% of NLV (Net Liquidation Value) divided by margin = qty of virgins
 
-PROTECT_ME: True
+PROTECT_ME: False
 PROTECT_DTE: 35
-PROTECTION_STRIP: 5 # no of strikes down for longs and up for shorts
+PROTECTION_STRIP: 5 # no of valid strikes to go down for longs and up for shorts.
 
 REAP_ME: True
-REAPRATIO: 0.03 # percentage of average cost. Lower the better.
+REAPRATIO: 0.025 # percentage of average cost. Lower the better.
 MINREAPDTE: 1 # do not reap on or under this DTE.
